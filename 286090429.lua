@@ -52,7 +52,8 @@ getgenv().LunarState = {
             EspBoxColor = Color3.fromRGB(255, 0, 0),
             TracerColor = Color3.fromRGB(255, 0, 0),
             FovThickness = 1,
-            TracerThickness = 2
+            TracerThickness = 2,
+            EspStyle = "2D Box"
         },
         Keys = {
             Aimbot = Enum.KeyCode.None,
@@ -173,7 +174,7 @@ local function fetchWithRetry(name, url, maxAttempts)
             print(string.format("[Lunar] ✅ %s loaded successfully on attempt %d!", name, attempt))
             break
         else
-            warn(string.format("[Lunar] ❌ %s failed (Attempt %d/%d): %s", name, attempt, maxAttempts, tostring(res)))
+            warn(string.format("[Lunar]  %s failed (Attempt %d/%d): %s", name, attempt, maxAttempts, tostring(res)))
             if attempt < maxAttempts then task.wait(2) end
         end
     end
@@ -186,9 +187,6 @@ local function fetchWithRetry(name, url, maxAttempts)
 end
 
 local Library = fetchWithRetry("UI Library", "https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/Library.lua", 3)
-local SaveManager = fetchWithRetry("Save Manager", "https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/addons/SaveManager.lua", 3)
-local ThemeManager = fetchWithRetry("Theme Manager", "https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/addons/ThemeManager.lua", 3)
-
 Library:SetWatermarkVisibility(false)
 
 local Window = Library:CreateWindow({
@@ -217,20 +215,63 @@ local function GetClosestTarget(maxDist)
     return target
 end
 
-local function createBox(player)
-    if player.Character and not player.Character:FindFirstChild("LunarBox") then
-        local box = Instance.new("BillboardGui", player.Character)
-        box.Name = "LunarBox"; box.Size = UDim2.new(4,0,5,0); box.AlwaysOnTop = true
-        box.Adornee = player.Character:FindFirstChild("HumanoidRootPart")
+local function createEsp(player)
+    if not player.Character or player.Character:FindFirstChild("LunarEsp") then return end
+    
+    local style = getgenv().LunarState.Config.Visuals.EspStyle
+    local color = getgenv().LunarState.Config.Visuals.EspBoxColor
+    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    local esp = Instance.new("BillboardGui", player.Character)
+    esp.Name = "LunarEsp"
+    esp.AlwaysOnTop = true
+    esp.Adornee = hrp
+    
+    if style == "2D Box" then
+        esp.Size = UDim2.new(4, 0, 5, 0)
         local t = 0.05
-        local function f(p,s)
-            local fr = Instance.new("Frame", box); fr.Size = s; fr.Position = p; 
-            fr.BackgroundColor3 = getgenv().LunarState.Config.Visuals.EspBoxColor; fr.BorderSizePixel = 0
+        local function addFrame(pos, size)
+            local fr = Instance.new("Frame", esp)
+            fr.Size = size
+            fr.Position = pos
+            fr.BackgroundColor3 = color
+            fr.BorderSizePixel = 0
         end
-        f(UDim2.new(0,0,0,0), UDim2.new(1,0,t,0))
-        f(UDim2.new(0,0,1-t,0), UDim2.new(1,0,t,0))
-        f(UDim2.new(0,0,0,0), UDim2.new(t,0,1,0))
-        f(UDim2.new(1-t,0,0,0), UDim2.new(t,0,1,0))
+        addFrame(UDim2.new(0,0,0,0), UDim2.new(1,0,t,0))
+        addFrame(UDim2.new(0,0,1-t,0), UDim2.new(1,0,t,0))
+        addFrame(UDim2.new(0,0,0,0), UDim2.new(t,0,1,0))
+        addFrame(UDim2.new(1-t,0,0,0), UDim2.new(t,0,1,0))
+        
+    elseif style == "3D Box" then
+        esp.Size = UDim2.new(5, 0, 6, 0)
+        local outline = Instance.new("Frame", esp)
+        outline.Size = UDim2.new(1,0,1,0)
+        outline.BackgroundTransparency = 1
+        local border = Instance.new("UIStroke", outline)
+        border.Color = color
+        border.Thickness = 2
+        border.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        
+    elseif style == "Corner" then
+        esp.Size = UDim2.new(4, 0, 5, 0)
+        local t = 0.15
+        local w = 0.04
+        local function addCorner(pos, size)
+            local fr = Instance.new("Frame", esp)
+            fr.Size = size
+            fr.Position = pos
+            fr.BackgroundColor3 = color
+            fr.BorderSizePixel = 0
+        end
+        addCorner(UDim2.new(0,0,0,0), UDim2.new(w,0,t,0))
+        addCorner(UDim2.new(0,0,0,0), UDim2.new(t,0,w,0))
+        addCorner(UDim2.new(1-w,0,0,0), UDim2.new(w,0,t,0))
+        addCorner(UDim2.new(1-t,0,0,0), UDim2.new(t,0,w,0))
+        addCorner(UDim2.new(0,0,1-t,0), UDim2.new(w,0,t,0))
+        addCorner(UDim2.new(0,0,1-w,0), UDim2.new(t,0,w,0))
+        addCorner(UDim2.new(1-w,0,1-t,0), UDim2.new(w,0,t,0))
+        addCorner(UDim2.new(1-t,0,1-w,0), UDim2.new(t,0,w,0))
     end
 end
 
@@ -240,18 +281,18 @@ local RageTab = Window:AddTab("Rage")
 local VisualsTab = Window:AddTab("Visuals")
 local ModsTab = Window:AddTab("Gun Mods")
 local MiscTab = Window:AddTab("Misc")
-local CustomTab = Window:AddTab("Customization")
 local SettingsTab = Window:AddTab("Settings")
 
 print("[Lunar] Building Combat Section...")
-local CombatGroup = CombatTab:AddLeftGroupbox("Aimbot Settings")
+local CombatGroup = CombatTab:AddLeftGroupbox("Aimbot")
 CombatGroup:AddToggle("AimbotEnabled", {
     Text = "Enable Aimbot",
     Callback = function(s) 
         getgenv().LunarState.Aimbot = s 
         fovCircle.Visible = s 
     end
-}):AddKeyPicker("AimbotKey", {
+})
+CombatGroup:AddKeyPicker("AimbotKey", {
     Default = "None",
     SyncToggleState = false,
     Mode = "Hold",
@@ -266,6 +307,14 @@ CombatGroup:AddSlider("AimFOV", {
     Callback = function(v) 
         getgenv().LunarState.Config.AimFOV = v 
         fovCircle.Radius = v 
+    end
+})
+CombatGroup:AddColorPicker("AimbotFovColor", {
+    Text = "FOV Color",
+    Default = getgenv().LunarState.Config.Visuals.AimbotFovColor,
+    Callback = function(c) 
+        getgenv().LunarState.Config.Visuals.AimbotFovColor = c
+        fovCircle.Color = c
     end
 })
 CombatGroup:AddSlider("AimSmooth", {
@@ -286,7 +335,8 @@ local TriggerGroup = CombatTab:AddRightGroupbox("Triggerbot")
 TriggerGroup:AddToggle("TriggerEnabled", {
     Text = "Enable Triggerbot",
     Callback = function(s) getgenv().LunarState.Trigger = s end
-}):AddKeyPicker("TriggerKey", {
+})
+TriggerGroup:AddKeyPicker("TriggerKey", {
     Default = "None",
     SyncToggleState = false,
     Mode = "Hold",
@@ -308,7 +358,8 @@ SilentGroup:AddToggle("SilentEnabled", {
         getgenv().LunarState.Silent = state
         silentFovCircle.Visible = state
     end
-}):AddKeyPicker("SilentKey", {
+})
+SilentGroup:AddKeyPicker("SilentKey", {
     Default = "None",
     SyncToggleState = false,
     Mode = "Hold",
@@ -325,13 +376,22 @@ SilentGroup:AddSlider("SilentFOV", {
         silentFovCircle.Radius = v 
     end
 })
+SilentGroup:AddColorPicker("SilentFovColor", {
+    Text = "Silent FOV Color",
+    Default = getgenv().LunarState.Config.Visuals.SilentFovColor,
+    Callback = function(c) 
+        getgenv().LunarState.Config.Visuals.SilentFovColor = c
+        silentFovCircle.Color = c
+    end
+})
 
 print("[Lunar] Building Rage Section...")
 local RageGroup = RageTab:AddLeftGroupbox("Rage Configuration")
 RageGroup:AddToggle("RageEnabled", {
     Text = "Enable Ragebot",
     Callback = function(s) getgenv().LunarState.Rage = s end
-}):AddKeyPicker("RageKey", {
+})
+RageGroup:AddKeyPicker("RageKey", {
     Default = "None",
     SyncToggleState = false,
     Mode = "Hold",
@@ -355,12 +415,37 @@ RageGroup:AddSlider("RageHeight", {
 print("[Lunar] Building Visuals Section...")
 local VisualsGroup = VisualsTab:AddLeftGroupbox("ESP Options")
 VisualsGroup:AddToggle("ESPEnabled", {
-    Text = "Enable ESP Boxes",
+    Text = "Enable ESP",
     Callback = function(s) getgenv().LunarState.ESP = s end
 })
-VisualsGroup:AddToggle("TracerEnabled", {
+VisualsGroup:AddDropdown("EspStyle", {
+    Text = "ESP Style",
+    Values = {"2D Box", "3D Box", "Corner"},
+    Multi = false,
+    Default = "2D Box",
+    Callback = function(v) getgenv().LunarState.Config.Visuals.EspStyle = v end
+})
+VisualsGroup:AddColorPicker("EspBoxColor", {
+    Text = "ESP Color",
+    Default = getgenv().LunarState.Config.Visuals.EspBoxColor,
+    Callback = function(c) getgenv().LunarState.Config.Visuals.EspBoxColor = c end
+})
+
+local TracerGroup = VisualsTab:AddRightGroupbox("Tracers")
+TracerGroup:AddToggle("TracerEnabled", {
     Text = "Enable Tracers",
     Callback = function(s) getgenv().LunarState.Tracers = s end
+})
+TracerGroup:AddColorPicker("TracerColor", {
+    Text = "Tracer Color",
+    Default = getgenv().LunarState.Config.Visuals.TracerColor,
+    Callback = function(c) getgenv().LunarState.Config.Visuals.TracerColor = c end
+})
+TracerGroup:AddSlider("TracerThickness", {
+    Text = "Tracer Thickness",
+    Min = 1, Max = 5, Default = 2,
+    Rounding = 0,
+    Callback = function(v) getgenv().LunarState.Config.Visuals.TracerThickness = v end
 })
 
 print("[Lunar] Building Gun Mods Section...")
@@ -417,53 +502,6 @@ MiscGroup:AddButton("Unload Script", function()
     Library:Unload()
 end)
 
-print("[Lunar] Building Customization Section...")
-local CustomGroup = CustomTab:AddLeftGroupbox("Visual Colors")
-CustomGroup:AddColorPicker("AimbotFovColorPick", {
-    Text = "Aimbot FOV Color",
-    Default = getgenv().LunarState.Config.Visuals.AimbotFovColor,
-    Callback = function(c) 
-        getgenv().LunarState.Config.Visuals.AimbotFovColor = c
-        fovCircle.Color = c
-    end
-})
-CustomGroup:AddColorPicker("SilentFovColorPick", {
-    Text = "Silent FOV Color",
-    Default = getgenv().LunarState.Config.Visuals.SilentFovColor,
-    Callback = function(c) 
-        getgenv().LunarState.Config.Visuals.SilentFovColor = c
-        silentFovCircle.Color = c
-    end
-})
-CustomGroup:AddColorPicker("EspBoxColorPick", {
-    Text = "ESP Box Color",
-    Default = getgenv().LunarState.Config.Visuals.EspBoxColor,
-    Callback = function(c) getgenv().LunarState.Config.Visuals.EspBoxColor = c end
-})
-CustomGroup:AddColorPicker("TracerColorPick", {
-    Text = "Tracer Color",
-    Default = getgenv().LunarState.Config.Visuals.TracerColor,
-    Callback = function(c) getgenv().LunarState.Config.Visuals.TracerColor = c end
-})
-
-local ThicknessGroup = CustomTab:AddRightGroupbox("Line Thickness")
-ThicknessGroup:AddSlider("FovThickness", {
-    Text = "FOV Circle Thickness",
-    Min = 1, Max = 5, Default = 1,
-    Rounding = 0,
-    Callback = function(v) 
-        getgenv().LunarState.Config.Visuals.FovThickness = v
-        fovCircle.Thickness = v
-        silentFovCircle.Thickness = v
-    end
-})
-ThicknessGroup:AddSlider("TracerThickness", {
-    Text = "Tracer Thickness",
-    Min = 1, Max = 5, Default = 2,
-    Rounding = 0,
-    Callback = function(v) getgenv().LunarState.Config.Visuals.TracerThickness = v end
-})
-
 print("[Lunar] Building Settings Section...")
 local ConfigGroup = SettingsTab:AddLeftGroupbox("Configuration")
 ConfigGroup:AddButton("Save Config", function()
@@ -495,7 +533,7 @@ ConfigGroup:AddButton("Reset Config", function()
         Visuals = {
             AimbotFovColor = Color3.fromRGB(0,170,255), SilentFovColor = Color3.fromRGB(0,255,0),
             EspBoxColor = Color3.fromRGB(255,0,0), TracerColor = Color3.fromRGB(255,0,0),
-            FovThickness = 1, TracerThickness = 2
+            FovThickness = 1, TracerThickness = 2, EspStyle = "2D Box"
         },
         Keys = {Aimbot = Enum.KeyCode.None, Trigger = Enum.KeyCode.None, Silent = Enum.KeyCode.None, Rage = Enum.KeyCode.None}
     }
@@ -577,21 +615,27 @@ RunService.RenderStepped:Connect(function()
     local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     for _, p in pairs(Players:GetPlayers()) do
         if isEnemy(p) and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            if getgenv().LunarState.ESP then createBox(p)
-            else if p.Character:FindFirstChild("LunarBox") then p.Character.LunarBox:Destroy() end end
+            if getgenv().LunarState.ESP then 
+                createEsp(p)
+            else 
+                if p.Character:FindFirstChild("LunarEsp") then p.Character.LunarEsp:Destroy() end 
+            end
 
             if getgenv().LunarState.Tracers then
                 local pos, on = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
                 if on then
                     local l = getgenv().LunarState.Lines[lIdx] or Drawing.new("Line")
-                    l.Visible = true; l.Thickness = getgenv().LunarState.Config.Visuals.TracerThickness; 
+                    l.Visible = true
+                    l.Thickness = getgenv().LunarState.Config.Visuals.TracerThickness
                     l.Color = getgenv().LunarState.Config.Visuals.TracerColor
-                    l.From = center; l.To = Vector2.new(pos.X, pos.Y)
-                    getgenv().LunarState.Lines[lIdx] = l; lIdx = lIdx + 1
+                    l.From = center
+                    l.To = Vector2.new(pos.X, pos.Y)
+                    getgenv().LunarState.Lines[lIdx] = l
+                    lIdx = lIdx + 1
                 end
             end
         else
-            if p.Character and p.Character:FindFirstChild("LunarBox") then p.Character.LunarBox:Destroy() end
+            if p.Character and p.Character:FindFirstChild("LunarEsp") then p.Character.LunarEsp:Destroy() end
         end
     end
     for i = lIdx, #getgenv().LunarState.Lines do getgenv().LunarState.Lines[i].Visible = false end
