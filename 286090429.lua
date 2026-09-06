@@ -41,7 +41,14 @@ getgenv().LunarState = {
         AmmoVal = 300,
         PenetrationVal = 100,
         BoxColor = Color3.new(1, 0, 0),
-        TracerColor = Color3.new(1, 0, 0)
+        TracerColor = Color3.new(1, 0, 0),
+        SilentFOV = 200,
+        Keys = {
+            Aimbot = Enum.KeyCode.None,
+            Trigger = Enum.KeyCode.None,
+            Silent = Enum.KeyCode.None,
+            Rage = Enum.KeyCode.None
+        }
     }
 }
 
@@ -56,6 +63,13 @@ fovCircle.Filled = false
 fovCircle.Visible = false
 fovCircle.Radius = getgenv().LunarState.Config.AimFOV
 
+local silentFovCircle = Drawing.new("Circle")
+silentFovCircle.Thickness = 1
+silentFovCircle.Color = Color3.new(0, 1, 0)
+silentFovCircle.Filled = false
+silentFovCircle.Visible = false
+silentFovCircle.Radius = getgenv().LunarState.Config.SilentFOV
+
 local function SyncUI()
     for _, v in pairs(CoreGui:GetChildren()) do
         if v:IsA("ScreenGui") and (v.Name == "Linoria" or v:FindFirstChild("Main")) then
@@ -63,6 +77,19 @@ local function SyncUI()
             return v
         end
     end
+end
+
+local function isFeatureActive(featureName)
+    local state = getgenv().LunarState[featureName]
+    local key = getgenv().LunarState.Config.Keys[featureName]
+    
+    if not state then return false end
+    
+    if key ~= Enum.KeyCode.None then
+        return UserInputService:IsKeyDown(key)
+    end
+    
+    return true
 end
 
 local function isEnemy(p)
@@ -130,8 +157,8 @@ local Window = Library:CreateWindow({
 task.wait(0.5)
 SyncUI()
 
-local function GetClosestTarget()
-    local target, dist = nil, getgenv().LunarState.Config.AimFOV
+local function GetClosestTarget(maxDist)
+    local target, dist = nil, maxDist or getgenv().LunarState.Config.AimFOV
     local mLoc = UserInputService:GetMouseLocation()
     for _, p in pairs(Players:GetPlayers()) do
         if isEnemy(p) and p.Character and p.Character:FindFirstChild(getgenv().LunarState.Config.AimPart) then
@@ -177,6 +204,13 @@ CombatGroup:AddToggle("AimbotEnabled", {
         getgenv().LunarState.Aimbot = s 
         fovCircle.Visible = s 
     end
+}):AddKeyPicker("AimbotKey", {
+    Default = "None",
+    SyncToggleState = false,
+    Mode = "Hold",
+    Text = "Aimbot Key",
+    NoUI = true,
+    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Aimbot = new end
 })
 CombatGroup:AddSlider("AimFOV", {
     Text = "FOV Radius",
@@ -205,6 +239,13 @@ local TriggerGroup = CombatTab:AddRightGroupbox("Triggerbot")
 TriggerGroup:AddToggle("TriggerEnabled", {
     Text = "Enable Triggerbot",
     Callback = function(s) getgenv().LunarState.Trigger = s end
+}):AddKeyPicker("TriggerKey", {
+    Default = "None",
+    SyncToggleState = false,
+    Mode = "Hold",
+    Text = "Trigger Key",
+    NoUI = true,
+    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Trigger = new end
 })
 TriggerGroup:AddSlider("TriggerDelay", {
     Text = "Shot Delay (s)",
@@ -218,24 +259,23 @@ SilentGroup:AddToggle("SilentEnabled", {
     Text = "Enable Silent Aim",
     Callback = function(state)
         getgenv().LunarState.Silent = state
-        if state then
-            task.spawn(function()
-                while getgenv().LunarState.Silent and getgenv().LunarRunning do
-                    for _, v in pairs(Players:GetPlayers()) do
-                        if isEnemy(v) and v.Character then
-                            pcall(function()
-                                local parts = {"RightUpperLeg", "LeftUpperLeg", "HeadHB", "HumanoidRootPart"}
-                                for _, n in ipairs(parts) do
-                                    local p = v.Character:FindFirstChild(n)
-                                    if p then p.CanCollide = false; p.Transparency = 10; p.Size = Vector3.new(13,13,13) end
-                                end
-                            end)
-                        end
-                    end
-                    task.wait(1)
-                end
-            end)
-        end
+        silentFovCircle.Visible = state
+    end
+}):AddKeyPicker("SilentKey", {
+    Default = "None",
+    SyncToggleState = false,
+    Mode = "Hold",
+    Text = "Silent Aim Key",
+    NoUI = true,
+    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Silent = new end
+})
+SilentGroup:AddSlider("SilentFOV", {
+    Text = "Silent FOV",
+    Min = 10, Max = 500, Default = 200,
+    Rounding = 0,
+    Callback = function(v) 
+        getgenv().LunarState.Config.SilentFOV = v 
+        silentFovCircle.Radius = v 
     end
 })
 
@@ -243,6 +283,13 @@ local RageGroup = RageTab:AddLeftGroupbox("Rage Configuration")
 RageGroup:AddToggle("RageEnabled", {
     Text = "Enable Ragebot",
     Callback = function(s) getgenv().LunarState.Rage = s end
+}):AddKeyPicker("RageKey", {
+    Default = "None",
+    SyncToggleState = false,
+    Mode = "Hold",
+    Text = "Rage Key",
+    NoUI = true,
+    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Rage = new end
 })
 RageGroup:AddSlider("RageSpin", {
     Text = "Spin Speed",
@@ -320,6 +367,7 @@ MiscGroup:AddButton("Unload Script", function()
     getgenv().LunarRunning = false
     for _, l in pairs(getgenv().LunarState.Lines) do l:Remove() end
     fovCircle:Remove()
+    silentFovCircle:Remove()
     if MyUI then MyUI:Destroy() end
     Library:Unload()
 end)
@@ -334,6 +382,8 @@ RunService.RenderStepped:Connect(function()
     local mLoc = UserInputService:GetMouseLocation()
     fovCircle.Position = Vector2.new(mLoc.X, mLoc.Y)
     fovCircle.Radius = getgenv().LunarState.Config.AimFOV
+    silentFovCircle.Position = Vector2.new(mLoc.X, mLoc.Y)
+    silentFovCircle.Radius = getgenv().LunarState.Config.SilentFOV
 
     if getgenv().LunarState.NoAnims and LocalPlayer.Character then
         pcall(function()
@@ -345,7 +395,7 @@ RunService.RenderStepped:Connect(function()
         end)
     end
 
-    if getgenv().LunarState.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and not getgenv().LunarState.Rage then
+    if isFeatureActive("Aimbot") and not isFeatureActive("Rage") then
         local target = GetClosestTarget()
         if target and target.Character and target.Character:FindFirstChild(getgenv().LunarState.Config.AimPart) then
             local targetPos = target.Character[getgenv().LunarState.Config.AimPart].Position
@@ -356,7 +406,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    if getgenv().LunarState.Trigger then
+    if isFeatureActive("Trigger") then
         local target = Mouse.Target
         if target then
             local model = target:FindFirstAncestorWhichIsA("Model")
@@ -430,7 +480,7 @@ end)
 task.spawn(function()
     while task.wait(0.05) do
         if not getgenv().LunarRunning then break end
-        if getgenv().LunarState.Rage then
+        if isFeatureActive("Rage") then
             pcall(function()
                 local target = nil
                 local dist = 1000
