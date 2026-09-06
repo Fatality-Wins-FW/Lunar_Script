@@ -174,7 +174,7 @@ local function fetchWithRetry(name, url, maxAttempts)
             print(string.format("[Lunar] ✅ %s loaded successfully on attempt %d!", name, attempt))
             break
         else
-            warn(string.format("[Lunar]  %s failed (Attempt %d/%d): %s", name, attempt, maxAttempts, tostring(res)))
+            warn(string.format("[Lunar] ❌ %s failed (Attempt %d/%d): %s", name, attempt, maxAttempts, tostring(res)))
             if attempt < maxAttempts then task.wait(2) end
         end
     end
@@ -285,14 +285,14 @@ local SettingsTab = Window:AddTab("Settings")
 
 print("[Lunar] Building Combat Section...")
 local CombatGroup = CombatTab:AddLeftGroupbox("Aimbot")
-CombatGroup:AddToggle("AimbotEnabled", {
+local aimbotToggle = CombatGroup:AddToggle("AimbotEnabled", {
     Text = "Enable Aimbot",
     Callback = function(s) 
         getgenv().LunarState.Aimbot = s 
         fovCircle.Visible = s 
     end
 })
-CombatGroup:AddKeyPicker("AimbotKey", {
+aimbotToggle:AddKeyPicker("AimbotKey", {
     Default = "None",
     SyncToggleState = false,
     Mode = "Hold",
@@ -332,11 +332,11 @@ CombatGroup:AddDropdown("AimPart", {
 })
 
 local TriggerGroup = CombatTab:AddRightGroupbox("Triggerbot")
-TriggerGroup:AddToggle("TriggerEnabled", {
+local triggerToggle = TriggerGroup:AddToggle("TriggerEnabled", {
     Text = "Enable Triggerbot",
     Callback = function(s) getgenv().LunarState.Trigger = s end
 })
-TriggerGroup:AddKeyPicker("TriggerKey", {
+triggerToggle:AddKeyPicker("TriggerKey", {
     Default = "None",
     SyncToggleState = false,
     Mode = "Hold",
@@ -352,14 +352,14 @@ TriggerGroup:AddSlider("TriggerDelay", {
 })
 
 local SilentGroup = CombatTab:AddRightGroupbox("Silent Aim")
-SilentGroup:AddToggle("SilentEnabled", {
+local silentToggle = SilentGroup:AddToggle("SilentEnabled", {
     Text = "Enable Silent Aim",
     Callback = function(state)
         getgenv().LunarState.Silent = state
         silentFovCircle.Visible = state
     end
 })
-SilentGroup:AddKeyPicker("SilentKey", {
+silentToggle:AddKeyPicker("SilentKey", {
     Default = "None",
     SyncToggleState = false,
     Mode = "Hold",
@@ -387,11 +387,11 @@ SilentGroup:AddColorPicker("SilentFovColor", {
 
 print("[Lunar] Building Rage Section...")
 local RageGroup = RageTab:AddLeftGroupbox("Rage Configuration")
-RageGroup:AddToggle("RageEnabled", {
+local rageToggle = RageGroup:AddToggle("RageEnabled", {
     Text = "Enable Ragebot",
     Callback = function(s) getgenv().LunarState.Rage = s end
 })
-RageGroup:AddKeyPicker("RageKey", {
+rageToggle:AddKeyPicker("RageKey", {
     Default = "None",
     SyncToggleState = false,
     Mode = "Hold",
