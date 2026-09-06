@@ -1,4 +1,4 @@
-print("Loading Lunar Script!")
+print("[Lunar] Initializing Loader...")
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -153,7 +153,31 @@ local function shoot()
     end)
 end
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
+print("[Lunar] Loading UI Library...")
+local Library, LoadSuccess = nil, false
+local LibUrl = "https://raw.githubusercontent.com/linoriabackup/LinoriaLib/main/Library.lua"
+
+for attempt = 1, 3 do
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet(LibUrl))()
+    end)
+    
+    if success and result then
+        Library = result
+        LoadSuccess = true
+        print(string.format("[Lunar] UI Library loaded successfully on attempt %d!", attempt))
+        break
+    else
+        warn(string.format("[Lunar] Failed to load UI Library (Attempt %d/3): %s", attempt, tostring(result)))
+        task.wait(1)
+    end
+end
+
+if not LoadSuccess then
+    error("[Lunar] CRITICAL: Failed to load UI Library after 3 attempts. Script halted.")
+    return
+end
+
 Library:SetWatermarkVisibility(false)
 
 local Window = Library:CreateWindow({
@@ -199,6 +223,7 @@ local function createBox(player)
     end
 end
 
+print("[Lunar] Creating UI Tabs...")
 local CombatTab = Window:AddTab("Combat")
 local RageTab = Window:AddTab("Rage")
 local VisualsTab = Window:AddTab("Visuals")
@@ -207,6 +232,7 @@ local MiscTab = Window:AddTab("Misc")
 local CustomTab = Window:AddTab("Customization")
 local SettingsTab = Window:AddTab("Settings")
 
+print("[Lunar] Building Combat Section...")
 local CombatGroup = CombatTab:AddLeftGroupbox("Aimbot Settings")
 CombatGroup:AddToggle("AimbotEnabled", {
     Text = "Enable Aimbot",
@@ -289,6 +315,7 @@ SilentGroup:AddSlider("SilentFOV", {
     end
 })
 
+print("[Lunar] Building Rage Section...")
 local RageGroup = RageTab:AddLeftGroupbox("Rage Configuration")
 RageGroup:AddToggle("RageEnabled", {
     Text = "Enable Ragebot",
@@ -314,6 +341,7 @@ RageGroup:AddSlider("RageHeight", {
     Callback = function(v) getgenv().LunarState.Config.RageHeight = v end
 })
 
+print("[Lunar] Building Visuals Section...")
 local VisualsGroup = VisualsTab:AddLeftGroupbox("ESP Options")
 VisualsGroup:AddToggle("ESPEnabled", {
     Text = "Enable ESP Boxes",
@@ -324,6 +352,7 @@ VisualsGroup:AddToggle("TracerEnabled", {
     Callback = function(s) getgenv().LunarState.Tracers = s end
 })
 
+print("[Lunar] Building Gun Mods Section...")
 local ModsGroup = ModsTab:AddLeftGroupbox("Weapon Tweaks")
 ModsGroup:AddToggle("AmmoEnabled", {
     Text = "Infinite Ammo",
@@ -358,6 +387,7 @@ ModsGroup:AddSlider("PenetrationVal", {
     Callback = function(v) getgenv().LunarState.Config.PenetrationVal = v end
 })
 
+print("[Lunar] Building Misc Section...")
 local MiscGroup = MiscTab:AddLeftGroupbox("Utilities")
 MiscGroup:AddToggle("NoAnimsEnabled", {
     Text = "No Animations",
@@ -376,6 +406,7 @@ MiscGroup:AddButton("Unload Script", function()
     Library:Unload()
 end)
 
+print("[Lunar] Building Customization Section...")
 local CustomGroup = CustomTab:AddLeftGroupbox("Visual Colors")
 CustomGroup:AddColorPicker("AimbotFovColorPick", {
     Text = "Aimbot FOV Color",
@@ -422,6 +453,7 @@ ThicknessGroup:AddSlider("TracerThickness", {
     Callback = function(v) getgenv().LunarState.Config.Visuals.TracerThickness = v end
 })
 
+print("[Lunar] Building Settings Section...")
 local ConfigGroup = SettingsTab:AddLeftGroupbox("Configuration")
 ConfigGroup:AddButton("Save Config", function()
     pcall(function()
@@ -465,6 +497,7 @@ ConfigGroup:AddButton("Reset Config", function()
     Library:Notify("Config Reset!")
 end)
 
+print("[Lunar] Starting Runtime Loops...")
 local frameSkip = 0
 local modSkip = 0
 
@@ -626,4 +659,4 @@ UserInputService.InputBegan:Connect(function(i, gp)
     end
 end)
 
-print("Lunar Script Loaded Successfully!")
+print("[Lunar] All features initialized. Script running successfully!")
