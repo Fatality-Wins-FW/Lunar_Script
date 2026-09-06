@@ -8,7 +8,9 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
-if CoreGui:FindFirstChild("Lunar_Arsenal_V1") then CoreGui.Lunar_Arsenal_V1:Destroy() end
+if CoreGui:FindFirstChild("Lunar_Arsenal_V1") then 
+    CoreGui.Lunar_Arsenal_V1:Destroy() 
+end
 
 getgenv().LunarRunning = true
 getgenv().LunarState = {
@@ -44,11 +46,13 @@ getgenv().LunarState = {
 local MyUI = nil
 local uiVisible = true
 local isShooting = false
+
 local fovCircle = Drawing.new("Circle")
 fovCircle.Thickness = 1
 fovCircle.Color = Color3.new(1, 1, 1)
 fovCircle.Filled = false
 fovCircle.Visible = false
+fovCircle.Radius = getgenv().LunarState.Config.AimFOV
 
 local function SyncUI()
     for _, v in pairs(CoreGui:GetChildren()) do
@@ -168,13 +172,19 @@ local SettingsTab = Window:AddTab("Settings")
 local CombatGroup = CombatTab:AddLeftGroupbox("Aimbot Settings")
 CombatGroup:AddToggle("AimbotEnabled", {
     Text = "Enable Aimbot",
-    Callback = function(s) getgenv().LunarState.Aimbot = s; fovCircle.Visible = s end
+    Callback = function(s) 
+        getgenv().LunarState.Aimbot = s 
+        fovCircle.Visible = s 
+    end
 })
 CombatGroup:AddSlider("AimFOV", {
     Text = "FOV Radius",
     Min = 10, Max = 500, Default = 150,
     Rounding = 0,
-    Callback = function(v) getgenv().LunarState.Config.AimFOV = v; fovCircle.Radius = v end
+    Callback = function(v) 
+        getgenv().LunarState.Config.AimFOV = v 
+        fovCircle.Radius = v 
+    end
 })
 CombatGroup:AddSlider("AimSmooth", {
     Text = "Smoothness (0-1)",
@@ -306,7 +316,6 @@ ModsGroup:AddSlider("PenetrationVal", {
     Callback = function(v) getgenv().LunarState.Config.PenetrationVal = v end
 })
 
--- MISC
 local MiscGroup = MiscTab:AddLeftGroupbox("Utilities")
 MiscGroup:AddToggle("NoAnimsEnabled", {
     Text = "No Animations",
@@ -326,7 +335,9 @@ end)
 
 local ConfigGroup = SettingsTab:AddLeftGroupbox("Configuration")
 ConfigGroup:AddButton("Save Config", function()
-    local success, data = pcall(function() return writefile("LunarArsenalV1_Config.json", game:GetService("HttpService"):JSONEncode(getgenv().LunarState.Config)) end)
+    local success = pcall(function() 
+        writefile("LunarArsenalV1_Config.json", game:GetService("HttpService"):JSONEncode(getgenv().LunarState.Config)) 
+    end)
     if success then Library:Notify("Config Saved!") end
 end)
 ConfigGroup:AddButton("Load Config", function()
@@ -367,8 +378,6 @@ RunService.RenderStepped:Connect(function()
             local targetPos = target.Character[getgenv().LunarState.Config.AimPart].Position
             local currentPos = Camera.CFrame.Position
             local smooth = getgenv().LunarState.Config.AimSmoothness
-            
-            -- Simple Lerp for smoothness
             local newCFrame = CFrame.new(currentPos, targetPos)
             Camera.CFrame = Camera.CFrame:Lerp(newCFrame, smooth)
         end
