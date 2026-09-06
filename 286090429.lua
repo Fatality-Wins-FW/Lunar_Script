@@ -292,14 +292,16 @@ local aimbotToggle = CombatGroup:AddToggle("AimbotEnabled", {
         fovCircle.Visible = s 
     end
 })
-aimbotToggle:AddKeyPicker("AimbotKey", {
-    Default = "None",
-    SyncToggleState = false,
-    Mode = "Hold",
-    Text = "Aimbot Key",
-    NoUI = true,
-    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Aimbot = new end
-})
+if aimbotToggle and aimbotToggle.AddKeyPicker then
+    aimbotToggle:AddKeyPicker("AimbotKey", {
+        Default = "None",
+        SyncToggleState = false,
+        Mode = "Hold",
+        Text = "Aimbot Key",
+        NoUI = true,
+        ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Aimbot = new end
+    })
+end
 CombatGroup:AddSlider("AimFOV", {
     Text = "FOV Radius",
     Min = 10, Max = 500, Default = 150,
@@ -331,19 +333,22 @@ CombatGroup:AddDropdown("AimPart", {
     Callback = function(v) getgenv().LunarState.Config.AimPart = v end
 })
 
+print("[Lunar] Building Triggerbot Section...")
 local TriggerGroup = CombatTab:AddRightGroupbox("Triggerbot")
 local triggerToggle = TriggerGroup:AddToggle("TriggerEnabled", {
     Text = "Enable Triggerbot",
     Callback = function(s) getgenv().LunarState.Trigger = s end
 })
-triggerToggle:AddKeyPicker("TriggerKey", {
-    Default = "None",
-    SyncToggleState = false,
-    Mode = "Hold",
-    Text = "Trigger Key",
-    NoUI = true,
-    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Trigger = new end
-})
+if triggerToggle and triggerToggle.AddKeyPicker then
+    triggerToggle:AddKeyPicker("TriggerKey", {
+        Default = "None",
+        SyncToggleState = false,
+        Mode = "Hold",
+        Text = "Trigger Key",
+        NoUI = true,
+        ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Trigger = new end
+    })
+end
 TriggerGroup:AddSlider("TriggerDelay", {
     Text = "Shot Delay (s)",
     Min = 0, Max = 0.5, Default = 0.025,
@@ -351,6 +356,7 @@ TriggerGroup:AddSlider("TriggerDelay", {
     Callback = function(v) getgenv().LunarState.Config.TriggerDelay = v end
 })
 
+print("[Lunar] Building Silent Aim Section...")
 local SilentGroup = CombatTab:AddRightGroupbox("Silent Aim")
 local silentToggle = SilentGroup:AddToggle("SilentEnabled", {
     Text = "Enable Silent Aim",
@@ -359,14 +365,16 @@ local silentToggle = SilentGroup:AddToggle("SilentEnabled", {
         silentFovCircle.Visible = state
     end
 })
-silentToggle:AddKeyPicker("SilentKey", {
-    Default = "None",
-    SyncToggleState = false,
-    Mode = "Hold",
-    Text = "Silent Aim Key",
-    NoUI = true,
-    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Silent = new end
-})
+if silentToggle and silentToggle.AddKeyPicker then
+    silentToggle:AddKeyPicker("SilentKey", {
+        Default = "None",
+        SyncToggleState = false,
+        Mode = "Hold",
+        Text = "Silent Aim Key",
+        NoUI = true,
+        ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Silent = new end
+    })
+end
 SilentGroup:AddSlider("SilentFOV", {
     Text = "Silent FOV",
     Min = 10, Max = 500, Default = 200,
@@ -391,14 +399,16 @@ local rageToggle = RageGroup:AddToggle("RageEnabled", {
     Text = "Enable Ragebot",
     Callback = function(s) getgenv().LunarState.Rage = s end
 })
-rageToggle:AddKeyPicker("RageKey", {
-    Default = "None",
-    SyncToggleState = false,
-    Mode = "Hold",
-    Text = "Rage Key",
-    NoUI = true,
-    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Rage = new end
-})
+if rageToggle and rageToggle.AddKeyPicker then
+    rageToggle:AddKeyPicker("RageKey", {
+        Default = "None",
+        SyncToggleState = false,
+        Mode = "Hold",
+        Text = "Rage Key",
+        NoUI = true,
+        ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Rage = new end
+    })
+end
 RageGroup:AddSlider("RageSpin", {
     Text = "Spin Speed",
     Min = 0, Max = 100, Default = 30,
