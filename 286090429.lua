@@ -153,30 +153,41 @@ local function shoot()
     end)
 end
 
-print("[Lunar] Loading UI Library...")
-local Library, LoadSuccess = nil, false
-local LibUrl = "https://raw.githubusercontent.com/linoriabackup/LinoriaLib/main/Library.lua"
-
-for attempt = 1, 3 do
-    local success, result = pcall(function()
-        return loadstring(game:HttpGet(LibUrl))()
-    end)
+local function fetchWithRetry(name, url, maxAttempts)
+    print(string.format("[Lunar] Loading %s...", name))
+    local result, success = nil, false
     
-    if success and result then
-        Library = result
-        LoadSuccess = true
-        print(string.format("[Lunar] UI Library loaded successfully on attempt %d!", attempt))
-        break
-    else
-        warn(string.format("[Lunar] Failed to load UI Library (Attempt %d/3): %s", attempt, tostring(result)))
-        task.wait(1)
+    for attempt = 1, maxAttempts do
+        print(string.format("[Lunar] %s - Attempt %d/%d", name, attempt, maxAttempts))
+        local ok, res = pcall(function()
+            local content = game:HttpGet(url, true)
+            if not content or #content < 100 then
+                error("Empty or invalid response from server")
+            end
+            return loadstring(content)()
+        end)
+        
+        if ok and res and type(res) == "table" then
+            result = res
+            success = true
+            print(string.format("[Lunar] ✅ %s loaded successfully on attempt %d!", name, attempt))
+            break
+        else
+            warn(string.format("[Lunar] ❌ %s failed (Attempt %d/%d): %s", name, attempt, maxAttempts, tostring(res)))
+            if attempt < maxAttempts then task.wait(2) end
+        end
     end
+    
+    if not success then
+        error(string.format("[Lunar] CRITICAL: Failed to load %s after %d attempts. Script halted.", name, maxAttempts))
+    end
+    
+    return result
 end
 
-if not LoadSuccess then
-    error("[Lunar] CRITICAL: Failed to load UI Library after 3 attempts. Script halted.")
-    return
-end
+local Library = fetchWithRetry("UI Library", "https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/Library.lua", 3)
+local SaveManager = fetchWithRetry("Save Manager", "https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/addons/SaveManager.lua", 3)
+local ThemeManager = fetchWithRetry("Theme Manager", "https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/addons/ThemeManager.lua", 3)
 
 Library:SetWatermarkVisibility(false)
 
