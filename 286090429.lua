@@ -10,7 +10,9 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
-if CoreGui:FindFirstChild("Lunar_Arsenal_V1") then CoreGui.Lunar_Arsenal_V1:Destroy() end
+if CoreGui:FindFirstChild("Lunar_Arsenal_V1") then 
+    CoreGui.Lunar_Arsenal_V1:Destroy() 
+end
 
 getgenv().LunarRunning = true
 getgenv().LunarState = {
@@ -56,7 +58,7 @@ fovCircle.Radius = getgenv().LunarState.Config.AimFOV
 
 local function SyncUI()
     for _, v in pairs(CoreGui:GetChildren()) do
-        if v:IsA("ScreenGui") and (v.Name == "Wizard" or v:FindFirstChild("Main")) then
+        if v:IsA("ScreenGui") and (v.Name == "Linoria" or v:FindFirstChild("Main")) then
             MyUI = v
             return v
         end
@@ -116,8 +118,15 @@ local function shoot()
     end)
 end
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/wizard"))()
-local Window = Library:NewWindow("Lunar | Arsenal | V1")
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
+Library:SetWatermarkVisibility(false)
+
+local Window = Library:CreateWindow({
+    Title = "Lunar | Arsenal | V1",
+    Center = true,
+    AutoShow = true
+})
+
 task.wait(0.5)
 SyncUI()
 
@@ -155,75 +164,164 @@ local function createBox(player)
     end
 end
 
-local Combat = Window:NewSection("Combat")
-local Rage = Window:NewSection("Rage")
-local Visuals = Window:NewSection("Visuals")
-local Mods = Window:NewSection("Gun Mods")
-local Misc = Window:NewSection("Misc")
+local CombatTab = Window:AddTab("Combat")
+local RageTab = Window:AddTab("Rage")
+local VisualsTab = Window:AddTab("Visuals")
+local ModsTab = Window:AddTab("Gun Mods")
+local MiscTab = Window:AddTab("Misc")
 
-Combat:CreateToggle("Enable Aimbot", function(s) 
-    getgenv().LunarState.Aimbot = s 
-    fovCircle.Visible = s 
-end)
-Combat:CreateSlider("FOV Radius", 10, 500, 150, function(v) 
-    getgenv().LunarState.Config.AimFOV = v 
-    fovCircle.Radius = v 
-end)
-Combat:CreateSlider("Aim Smoothness", 0, 1, 0.2, function(v) 
-    getgenv().LunarState.Config.AimSmoothness = v 
-end)
-Combat:CreateDropdown("Target Part", {"Head", "HumanoidRootPart", "UpperTorso"}, function(v) 
-    getgenv().LunarState.Config.AimPart = v 
-end)
+local CombatGroup = CombatTab:AddLeftGroupbox("Aimbot Settings")
+CombatGroup:AddToggle("AimbotEnabled", {
+    Text = "Enable Aimbot",
+    Callback = function(s) 
+        getgenv().LunarState.Aimbot = s 
+        fovCircle.Visible = s 
+    end
+})
+CombatGroup:AddSlider("AimFOV", {
+    Text = "FOV Radius",
+    Min = 10, Max = 500, Default = 150,
+    Rounding = 0,
+    Callback = function(v) 
+        getgenv().LunarState.Config.AimFOV = v 
+        fovCircle.Radius = v 
+    end
+})
+CombatGroup:AddSlider("AimSmooth", {
+    Text = "Smoothness (0-1)",
+    Min = 0, Max = 1, Default = 0.2,
+    Rounding = 2,
+    Callback = function(v) getgenv().LunarState.Config.AimSmoothness = v end
+})
+CombatGroup:AddDropdown("AimPart", {
+    Text = "Target Part",
+    Values = {"Head", "HumanoidRootPart", "UpperTorso"},
+    Multi = false,
+    Default = "Head",
+    Callback = function(v) getgenv().LunarState.Config.AimPart = v end
+})
 
-Combat:CreateToggle("Enable Triggerbot", function(s) getgenv().LunarState.Trigger = s end)
-Combat:CreateSlider("Trigger Delay", 0, 0.5, 0.025, function(v) 
-    getgenv().LunarState.Config.TriggerDelay = v 
-end)
+local TriggerGroup = CombatTab:AddRightGroupbox("Triggerbot")
+TriggerGroup:AddToggle("TriggerEnabled", {
+    Text = "Enable Triggerbot",
+    Callback = function(s) getgenv().LunarState.Trigger = s end
+})
+TriggerGroup:AddSlider("TriggerDelay", {
+    Text = "Shot Delay (s)",
+    Min = 0, Max = 0.5, Default = 0.025,
+    Rounding = 3,
+    Callback = function(v) getgenv().LunarState.Config.TriggerDelay = v end
+})
 
-Combat:CreateToggle("Silent Aim", function(state)
-    getgenv().LunarState.Silent = state
-    task.spawn(function()
-        while getgenv().LunarState.Silent and getgenv().LunarRunning do
-            for _, v in pairs(Players:GetPlayers()) do
-                if isEnemy(v) and v.Character then
-                    pcall(function()
-                        local parts = {"RightUpperLeg", "LeftUpperLeg", "HeadHB", "HumanoidRootPart"}
-                        for _, n in ipairs(parts) do
-                            local p = v.Character:FindFirstChild(n)
-                            if p then p.CanCollide = false; p.Transparency = 10; p.Size = Vector3.new(13,13,13) end
+local SilentGroup = CombatTab:AddRightGroupbox("Silent Aim")
+SilentGroup:AddToggle("SilentEnabled", {
+    Text = "Enable Silent Aim",
+    Callback = function(state)
+        getgenv().LunarState.Silent = state
+        if state then
+            task.spawn(function()
+                while getgenv().LunarState.Silent and getgenv().LunarRunning do
+                    for _, v in pairs(Players:GetPlayers()) do
+                        if isEnemy(v) and v.Character then
+                            pcall(function()
+                                local parts = {"RightUpperLeg", "LeftUpperLeg", "HeadHB", "HumanoidRootPart"}
+                                for _, n in ipairs(parts) do
+                                    local p = v.Character:FindFirstChild(n)
+                                    if p then p.CanCollide = false; p.Transparency = 10; p.Size = Vector3.new(13,13,13) end
+                                end
+                            end)
                         end
-                    end)
+                    end
+                    task.wait(1)
                 end
-            end
-            task.wait(1)
+            end)
         end
-    end)
-end)
+    end
+})
 
-Rage:CreateToggle("Enable Ragebot", function(s) getgenv().LunarState.Rage = s end)
-Rage:CreateSlider("Spin Speed", 0, 100, 30, function(v) getgenv().LunarState.Config.RageSpinSpeed = v end)
-Rage:CreateSlider("Teleport Height", 0, 20, 9, function(v) getgenv().LunarState.Config.RageHeight = v end)
+local RageGroup = RageTab:AddLeftGroupbox("Rage Configuration")
+RageGroup:AddToggle("RageEnabled", {
+    Text = "Enable Ragebot",
+    Callback = function(s) getgenv().LunarState.Rage = s end
+})
+RageGroup:AddSlider("RageSpin", {
+    Text = "Spin Speed",
+    Min = 0, Max = 100, Default = 30,
+    Rounding = 0,
+    Callback = function(v) getgenv().LunarState.Config.RageSpinSpeed = v end
+})
+RageGroup:AddSlider("RageHeight", {
+    Text = "Teleport Height",
+    Min = 0, Max = 20, Default = 9,
+    Rounding = 0,
+    Callback = function(v) getgenv().LunarState.Config.RageHeight = v end
+})
 
-Visuals:CreateToggle("Enemy Boxes", function(s) getgenv().LunarState.ESP = s end)
-Visuals:CreateToggle("Enemy Tracers", function(s) getgenv().LunarState.Tracers = s end)
+local VisualsGroup = VisualsTab:AddLeftGroupbox("ESP Options")
+VisualsGroup:AddToggle("ESPEnabled", {
+    Text = "Enable ESP Boxes",
+    Callback = function(s) getgenv().LunarState.ESP = s end
+})
+VisualsGroup:AddToggle("TracerEnabled", {
+    Text = "Enable Tracers",
+    Callback = function(s) getgenv().LunarState.Tracers = s end
+})
 
-Mods:CreateToggle("Infinite Ammo", function(s) getgenv().LunarState.Ammo = s end)
-Mods:CreateSlider("Ammo Amount", 1, 999, 300, function(v) getgenv().LunarState.Config.AmmoVal = v end)
-Mods:CreateToggle("100% Accuracy", function(s) getgenv().LunarState.Acc = s end)
-Mods:CreateToggle("Custom Fire Rate", function(s) getgenv().LunarState.FireRate = s end)
-Mods:CreateSlider("Fire Rate Value", 0.01, 1, 0.05, function(v) getgenv().LunarState.Config.FireRateVal = v end)
-Mods:CreateToggle("All Automatic", function(s) getgenv().LunarState.Auto = s end)
-Mods:CreateToggle("WallBang", function(s) getgenv().LunarState.WallBang = s end)
-Mods:CreateSlider("Penetration Power", 1, 500, 100, function(v) getgenv().LunarState.Config.PenetrationVal = v end)
+local ModsGroup = ModsTab:AddLeftGroupbox("Weapon Tweaks")
+ModsGroup:AddToggle("AmmoEnabled", {
+    Text = "Infinite Ammo",
+    Callback = function(s) getgenv().LunarState.Ammo = s end
+})
+ModsGroup:AddSlider("AmmoAmount", {
+    Text = "Ammo Value",
+    Min = 1, Max = 999, Default = 300,
+    Rounding = 0,
+    Callback = function(v) getgenv().LunarState.Config.AmmoVal = v end
+})
+ModsGroup:AddToggle("AccEnabled", {
+    Text = "100% Accuracy",
+    Callback = function(s) getgenv().LunarState.Acc = s end
+})
+ModsGroup:AddToggle("FireRateEnabled", {
+    Text = "Custom Fire Rate",
+    Callback = function(s) getgenv().LunarState.FireRate = s end
+})
+ModsGroup:AddSlider("FireRateVal", {
+    Text = "Fire Rate (s)",
+    Min = 0.01, Max = 1, Default = 0.05,
+    Rounding = 3,
+    Callback = function(v) getgenv().LunarState.Config.FireRateVal = v end
+})
+ModsGroup:AddToggle("AutoEnabled", {
+    Text = "All Automatic",
+    Callback = function(s) getgenv().LunarState.Auto = s end
+})
+ModsGroup:AddToggle("WallbangEnabled", {
+    Text = "Wallbang",
+    Callback = function(s) getgenv().LunarState.WallBang = s end
+})
+ModsGroup:AddSlider("PenetrationVal", {
+    Text = "Penetration Power",
+    Min = 1, Max = 500, Default = 100,
+    Rounding = 0,
+    Callback = function(v) getgenv().LunarState.Config.PenetrationVal = v end
+})
 
-Misc:CreateToggle("No Animations", function(s) getgenv().LunarState.NoAnims = s end)
-Misc:CreateToggle("Auto Inspect", function(s) getgenv().LunarState.AutoInspect = s end)
-Misc:CreateButton("Unload Script", function()
+local MiscGroup = MiscTab:AddLeftGroupbox("Utilities")
+MiscGroup:AddToggle("NoAnimsEnabled", {
+    Text = "No Animations",
+    Callback = function(s) getgenv().LunarState.NoAnims = s end
+})
+MiscGroup:AddToggle("AutoInspectEnabled", {
+    Text = "Auto Inspect",
+    Callback = function(s) getgenv().LunarState.AutoInspect = s end
+})
+MiscGroup:AddButton("Unload Script", function()
     getgenv().LunarRunning = false
     for _, l in pairs(getgenv().LunarState.Lines) do l:Remove() end
     fovCircle:Remove()
     if MyUI then MyUI:Destroy() end
+    Library:Unload()
 end)
 
 local frameSkip = 0
@@ -362,6 +460,7 @@ end)
 UserInputService.InputBegan:Connect(function(i, gp)
     if gp then return end
     if i.KeyCode == Enum.KeyCode.RightShift then
+        Library:Toggle()
         if not MyUI then SyncUI() end
         if MyUI then
             uiVisible = not uiVisible

