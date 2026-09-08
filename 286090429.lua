@@ -54,12 +54,6 @@ getgenv().LunarState = {
             FovThickness = 1,
             TracerThickness = 2,
             EspStyle = "2D Box"
-        },
-        Keys = {
-            Aimbot = Enum.KeyCode.None,
-            Trigger = Enum.KeyCode.None,
-            Silent = Enum.KeyCode.None,
-            Rage = Enum.KeyCode.None
         }
     }
 }
@@ -89,16 +83,6 @@ local function SyncUI()
             return v
         end
     end
-end
-
-local function isFeatureActive(featureName)
-    local state = getgenv().LunarState[featureName]
-    local key = getgenv().LunarState.Config.Keys[featureName]
-    if not state then return false end
-    if key ~= Enum.KeyCode.None then
-        return UserInputService:IsKeyDown(key)
-    end
-    return true
 end
 
 local function isEnemy(p)
@@ -275,6 +259,16 @@ local function createEsp(player)
     end
 end
 
+local function safeAdd(groupbox, method, ...)
+    local ok, res = pcall(function()
+        return groupbox[method](groupbox, ...)
+    end)
+    if not ok then
+        warn(string.format("[Lunar] Failed to add UI element '%s': %s", method, tostring(res)))
+    end
+    return res
+end
+
 print("[Lunar] Creating UI Tabs...")
 local CombatTab = Window:AddTab("Combat")
 local RageTab = Window:AddTab("Rage")
@@ -285,24 +279,14 @@ local SettingsTab = Window:AddTab("Settings")
 
 print("[Lunar] Building Combat Section...")
 local CombatGroup = CombatTab:AddLeftGroupbox("Aimbot")
-local aimbotToggle = CombatGroup:AddToggle("AimbotEnabled", {
+safeAdd(CombatGroup, "AddToggle", "AimbotEnabled", {
     Text = "Enable Aimbot",
     Callback = function(s) 
         getgenv().LunarState.Aimbot = s 
         fovCircle.Visible = s 
     end
 })
-if aimbotToggle and aimbotToggle.AddKeyPicker then
-    aimbotToggle:AddKeyPicker("AimbotKey", {
-        Default = "None",
-        SyncToggleState = false,
-        Mode = "Hold",
-        Text = "Aimbot Key",
-        NoUI = true,
-        ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Aimbot = new end
-    })
-end
-CombatGroup:AddSlider("AimFOV", {
+safeAdd(CombatGroup, "AddSlider", "AimFOV", {
     Text = "FOV Radius",
     Min = 10, Max = 500, Default = 150,
     Rounding = 0,
@@ -311,7 +295,7 @@ CombatGroup:AddSlider("AimFOV", {
         fovCircle.Radius = v 
     end
 })
-CombatGroup:AddColorPicker("AimbotFovColor", {
+safeAdd(CombatGroup, "AddColorPicker", "AimbotFovColor", {
     Text = "FOV Color",
     Default = getgenv().LunarState.Config.Visuals.AimbotFovColor,
     Callback = function(c) 
@@ -319,13 +303,13 @@ CombatGroup:AddColorPicker("AimbotFovColor", {
         fovCircle.Color = c
     end
 })
-CombatGroup:AddSlider("AimSmooth", {
+safeAdd(CombatGroup, "AddSlider", "AimSmooth", {
     Text = "Smoothness (0-1)",
     Min = 0, Max = 1, Default = 0.2,
     Rounding = 2,
     Callback = function(v) getgenv().LunarState.Config.AimSmoothness = v end
 })
-CombatGroup:AddDropdown("AimPart", {
+safeAdd(CombatGroup, "AddDropdown", "AimPart", {
     Text = "Target Part",
     Values = {"Head", "HumanoidRootPart", "UpperTorso"},
     Multi = false,
@@ -335,21 +319,11 @@ CombatGroup:AddDropdown("AimPart", {
 
 print("[Lunar] Building Triggerbot Section...")
 local TriggerGroup = CombatTab:AddRightGroupbox("Triggerbot")
-local triggerToggle = TriggerGroup:AddToggle("TriggerEnabled", {
+safeAdd(TriggerGroup, "AddToggle", "TriggerEnabled", {
     Text = "Enable Triggerbot",
     Callback = function(s) getgenv().LunarState.Trigger = s end
 })
-if triggerToggle and triggerToggle.AddKeyPicker then
-    triggerToggle:AddKeyPicker("TriggerKey", {
-        Default = "None",
-        SyncToggleState = false,
-        Mode = "Hold",
-        Text = "Trigger Key",
-        NoUI = true,
-        ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Trigger = new end
-    })
-end
-TriggerGroup:AddSlider("TriggerDelay", {
+safeAdd(TriggerGroup, "AddSlider", "TriggerDelay", {
     Text = "Shot Delay (s)",
     Min = 0, Max = 0.5, Default = 0.025,
     Rounding = 3,
@@ -358,24 +332,14 @@ TriggerGroup:AddSlider("TriggerDelay", {
 
 print("[Lunar] Building Silent Aim Section...")
 local SilentGroup = CombatTab:AddRightGroupbox("Silent Aim")
-local silentToggle = SilentGroup:AddToggle("SilentEnabled", {
+safeAdd(SilentGroup, "AddToggle", "SilentEnabled", {
     Text = "Enable Silent Aim",
     Callback = function(state)
         getgenv().LunarState.Silent = state
         silentFovCircle.Visible = state
     end
 })
-if silentToggle and silentToggle.AddKeyPicker then
-    silentToggle:AddKeyPicker("SilentKey", {
-        Default = "None",
-        SyncToggleState = false,
-        Mode = "Hold",
-        Text = "Silent Aim Key",
-        NoUI = true,
-        ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Silent = new end
-    })
-end
-SilentGroup:AddSlider("SilentFOV", {
+safeAdd(SilentGroup, "AddSlider", "SilentFOV", {
     Text = "Silent FOV",
     Min = 10, Max = 500, Default = 200,
     Rounding = 0,
@@ -384,7 +348,7 @@ SilentGroup:AddSlider("SilentFOV", {
         silentFovCircle.Radius = v 
     end
 })
-SilentGroup:AddColorPicker("SilentFovColor", {
+safeAdd(SilentGroup, "AddColorPicker", "SilentFovColor", {
     Text = "Silent FOV Color",
     Default = getgenv().LunarState.Config.Visuals.SilentFovColor,
     Callback = function(c) 
@@ -395,27 +359,17 @@ SilentGroup:AddColorPicker("SilentFovColor", {
 
 print("[Lunar] Building Rage Section...")
 local RageGroup = RageTab:AddLeftGroupbox("Rage Configuration")
-local rageToggle = RageGroup:AddToggle("RageEnabled", {
+safeAdd(RageGroup, "AddToggle", "RageEnabled", {
     Text = "Enable Ragebot",
     Callback = function(s) getgenv().LunarState.Rage = s end
 })
-if rageToggle and rageToggle.AddKeyPicker then
-    rageToggle:AddKeyPicker("RageKey", {
-        Default = "None",
-        SyncToggleState = false,
-        Mode = "Hold",
-        Text = "Rage Key",
-        NoUI = true,
-        ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Rage = new end
-    })
-end
-RageGroup:AddSlider("RageSpin", {
+safeAdd(RageGroup, "AddSlider", "RageSpin", {
     Text = "Spin Speed",
     Min = 0, Max = 100, Default = 30,
     Rounding = 0,
     Callback = function(v) getgenv().LunarState.Config.RageSpinSpeed = v end
 })
-RageGroup:AddSlider("RageHeight", {
+safeAdd(RageGroup, "AddSlider", "RageHeight", {
     Text = "Teleport Height",
     Min = 0, Max = 20, Default = 9,
     Rounding = 0,
@@ -424,34 +378,34 @@ RageGroup:AddSlider("RageHeight", {
 
 print("[Lunar] Building Visuals Section...")
 local VisualsGroup = VisualsTab:AddLeftGroupbox("ESP Options")
-VisualsGroup:AddToggle("ESPEnabled", {
+safeAdd(VisualsGroup, "AddToggle", "ESPEnabled", {
     Text = "Enable ESP",
     Callback = function(s) getgenv().LunarState.ESP = s end
 })
-VisualsGroup:AddDropdown("EspStyle", {
+safeAdd(VisualsGroup, "AddDropdown", "EspStyle", {
     Text = "ESP Style",
     Values = {"2D Box", "3D Box", "Corner"},
     Multi = false,
     Default = "2D Box",
     Callback = function(v) getgenv().LunarState.Config.Visuals.EspStyle = v end
 })
-VisualsGroup:AddColorPicker("EspBoxColor", {
+safeAdd(VisualsGroup, "AddColorPicker", "EspBoxColor", {
     Text = "ESP Color",
     Default = getgenv().LunarState.Config.Visuals.EspBoxColor,
     Callback = function(c) getgenv().LunarState.Config.Visuals.EspBoxColor = c end
 })
 
 local TracerGroup = VisualsTab:AddRightGroupbox("Tracers")
-TracerGroup:AddToggle("TracerEnabled", {
+safeAdd(TracerGroup, "AddToggle", "TracerEnabled", {
     Text = "Enable Tracers",
     Callback = function(s) getgenv().LunarState.Tracers = s end
 })
-TracerGroup:AddColorPicker("TracerColor", {
+safeAdd(TracerGroup, "AddColorPicker", "TracerColor", {
     Text = "Tracer Color",
     Default = getgenv().LunarState.Config.Visuals.TracerColor,
     Callback = function(c) getgenv().LunarState.Config.Visuals.TracerColor = c end
 })
-TracerGroup:AddSlider("TracerThickness", {
+safeAdd(TracerGroup, "AddSlider", "TracerThickness", {
     Text = "Tracer Thickness",
     Min = 1, Max = 5, Default = 2,
     Rounding = 0,
@@ -460,33 +414,33 @@ TracerGroup:AddSlider("TracerThickness", {
 
 print("[Lunar] Building Gun Mods Section...")
 local ModsGroup = ModsTab:AddLeftGroupbox("Weapon Tweaks")
-ModsGroup:AddToggle("AmmoEnabled", {
+safeAdd(ModsGroup, "AddToggle", "AmmoEnabled", {
     Text = "Infinite Ammo",
     Callback = function(s) getgenv().LunarState.Ammo = s end
 })
-ModsGroup:AddToggle("AccEnabled", {
+safeAdd(ModsGroup, "AddToggle", "AccEnabled", {
     Text = "100% Accuracy",
     Callback = function(s) getgenv().LunarState.Acc = s end
 })
-ModsGroup:AddToggle("FireRateEnabled", {
+safeAdd(ModsGroup, "AddToggle", "FireRateEnabled", {
     Text = "Custom Fire Rate",
     Callback = function(s) getgenv().LunarState.FireRate = s end
 })
-ModsGroup:AddSlider("FireRateVal", {
+safeAdd(ModsGroup, "AddSlider", "FireRateVal", {
     Text = "Fire Rate (s)",
     Min = 0.01, Max = 1, Default = 0.05,
     Rounding = 3,
     Callback = function(v) getgenv().LunarState.Config.FireRateVal = v end
 })
-ModsGroup:AddToggle("AutoEnabled", {
+safeAdd(ModsGroup, "AddToggle", "AutoEnabled", {
     Text = "All Automatic",
     Callback = function(s) getgenv().LunarState.Auto = s end
 })
-ModsGroup:AddToggle("WallbangEnabled", {
+safeAdd(ModsGroup, "AddToggle", "WallbangEnabled", {
     Text = "Wallbang",
     Callback = function(s) getgenv().LunarState.WallBang = s end
 })
-ModsGroup:AddSlider("PenetrationVal", {
+safeAdd(ModsGroup, "AddSlider", "PenetrationVal", {
     Text = "Penetration Power",
     Min = 1, Max = 500, Default = 100,
     Rounding = 0,
@@ -495,15 +449,15 @@ ModsGroup:AddSlider("PenetrationVal", {
 
 print("[Lunar] Building Misc Section...")
 local MiscGroup = MiscTab:AddLeftGroupbox("Utilities")
-MiscGroup:AddToggle("NoAnimsEnabled", {
+safeAdd(MiscGroup, "AddToggle", "NoAnimsEnabled", {
     Text = "No Animations",
     Callback = function(s) getgenv().LunarState.NoAnims = s end
 })
-MiscGroup:AddToggle("AutoInspectEnabled", {
+safeAdd(MiscGroup, "AddToggle", "AutoInspectEnabled", {
     Text = "Auto Inspect",
     Callback = function(s) getgenv().LunarState.AutoInspect = s end
 })
-MiscGroup:AddButton("Unload Script", function()
+safeAdd(MiscGroup, "AddButton", "UnloadBtn", "Unload Script", function()
     getgenv().LunarRunning = false
     for _, l in pairs(getgenv().LunarState.Lines) do l:Remove() end
     fovCircle:Remove()
@@ -514,13 +468,13 @@ end)
 
 print("[Lunar] Building Settings Section...")
 local ConfigGroup = SettingsTab:AddLeftGroupbox("Configuration")
-ConfigGroup:AddButton("Save Config", function()
+safeAdd(ConfigGroup, "AddButton", "SaveConfigBtn", "Save Config", function()
     pcall(function()
         writefile("LunarArsenal_Config.json", HttpService:JSONEncode(getgenv().LunarState.Config))
         Library:Notify("Config Saved!")
     end)
 end)
-ConfigGroup:AddButton("Load Config", function()
+safeAdd(ConfigGroup, "AddButton", "LoadConfigBtn", "Load Config", function()
     pcall(function()
         local data = readfile("LunarArsenal_Config.json")
         local decoded = HttpService:JSONDecode(data)
@@ -534,7 +488,7 @@ ConfigGroup:AddButton("Load Config", function()
         Library:Notify("Config Loaded!")
     end)
 end)
-ConfigGroup:AddButton("Reset Config", function()
+safeAdd(ConfigGroup, "AddButton", "ResetConfigBtn", "Reset Config", function()
     getgenv().LunarState.Config = {
         AimFOV = 150, AimSmoothness = 0.2, AimPart = "Head", TriggerDelay = 0.025,
         RageSpinSpeed = 30, RageHeight = 9, FireRateVal = 0.05, PenetrationVal = 100,
@@ -544,8 +498,7 @@ ConfigGroup:AddButton("Reset Config", function()
             AimbotFovColor = Color3.fromRGB(0,170,255), SilentFovColor = Color3.fromRGB(0,255,0),
             EspBoxColor = Color3.fromRGB(255,0,0), TracerColor = Color3.fromRGB(255,0,0),
             FovThickness = 1, TracerThickness = 2, EspStyle = "2D Box"
-        },
-        Keys = {Aimbot = Enum.KeyCode.None, Trigger = Enum.KeyCode.None, Silent = Enum.KeyCode.None, Rage = Enum.KeyCode.None}
+        }
     }
     fovCircle.Color = getgenv().LunarState.Config.Visuals.AimbotFovColor
     fovCircle.Radius = getgenv().LunarState.Config.AimFOV
@@ -580,31 +533,18 @@ RunService.RenderStepped:Connect(function()
         end)
     end
 
-    local aimbotActive = isFeatureActive("Aimbot")
-    local hasKeybind = getgenv().LunarState.Config.Keys.Aimbot ~= Enum.KeyCode.None
-    local mb2Pressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-    
-    if aimbotActive and not isFeatureActive("Rage") then
-        local shouldAim = false
-        if hasKeybind then
-            shouldAim = mb2Pressed
-        else
-            shouldAim = true
-        end
-        
-        if shouldAim then
-            local target = GetClosestTarget()
-            if target and target.Character and target.Character:FindFirstChild(getgenv().LunarState.Config.AimPart) then
-                local targetPos = target.Character[getgenv().LunarState.Config.AimPart].Position
-                local currentPos = Camera.CFrame.Position
-                local smooth = getgenv().LunarState.Config.AimSmoothness
-                local newCFrame = CFrame.new(currentPos, targetPos)
-                Camera.CFrame = Camera.CFrame:Lerp(newCFrame, smooth)
-            end
+    if getgenv().LunarState.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and not getgenv().LunarState.Rage then
+        local target = GetClosestTarget()
+        if target and target.Character and target.Character:FindFirstChild(getgenv().LunarState.Config.AimPart) then
+            local targetPos = target.Character[getgenv().LunarState.Config.AimPart].Position
+            local currentPos = Camera.CFrame.Position
+            local smooth = getgenv().LunarState.Config.AimSmoothness
+            local newCFrame = CFrame.new(currentPos, targetPos)
+            Camera.CFrame = Camera.CFrame:Lerp(newCFrame, smooth)
         end
     end
 
-    if isFeatureActive("Trigger") then
+    if getgenv().LunarState.Trigger then
         local target = Mouse.Target
         if target then
             local model = target:FindFirstAncestorWhichIsA("Model")
@@ -685,7 +625,7 @@ end)
 task.spawn(function()
     while task.wait(0.05) do
         if not getgenv().LunarRunning then break end
-        if isFeatureActive("Rage") then
+        if getgenv().LunarState.Rage then
             pcall(function()
                 local target = nil
                 local dist = 1000
