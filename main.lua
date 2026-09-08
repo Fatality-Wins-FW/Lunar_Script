@@ -2,7 +2,7 @@ local HttpService = game:GetService("HttpService")
 
 local supported_games = {
     ["286090429"] = "https://github.com/Fatality-Wins-FW/Lunar_Script/raw/refs/heads/main/286090429.lua",
-    
+    ["Universal"] = "https://github.com/Fatality-Wins-FW/Lunar_Script/raw/refs/heads/main/universal.lua",
 }
 
 local function loadScript(url, label)
