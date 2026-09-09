@@ -237,7 +237,9 @@ local function CreateESPObject(plr)
     if ESPObjects[plr] then
         return
     end
-    local cornerLines = {}
+
+    -- Initialize Drawing objects safely
+    local cornerLines, tracer, name, healthBg, healthBar, skeletons = {}, nil, nil, nil, nil, {}
     if hasDrawing then
         for i = 1, 8 do
             local l = Drawing.new("Line")
@@ -245,79 +247,66 @@ local function CreateESPObject(plr)
             l.Visible = false
             table.insert(cornerLines, l)
         end
-    end
-
-    ESPObjects[plr] = {
-        Box = Instance.new("BillboardGui", plr.Character),
-        CornerLines = cornerLines,
-        Tracer = hasDrawing and Drawing.new("Line"),
-        Name = hasDrawing and Drawing.new("Text"),
-        HealthBarBg = hasDrawing and Drawing.new("Square"),
-        HealthBar = hasDrawing and Drawing.new("Square"),
-        Skeletons = {}
-    }
-    local obj = ESPObjects[plr]
-    obj.Box.Name = "LunarEsp"
-    obj.Box.AlwaysOnTop = true
-    local hrp = plr.Character:FindFirstChild("HumanoidRootPart") or plr.Character:FindFirstChild("Torso")
-    if hrp then
-        obj.Box.Adornee = hrp
-    end
-
-    if hasDrawing then
-        obj.Tracer.Thickness = 1
-        obj.Name.Size = 13
-        obj.Name.Center = true
-        obj.Name.Outline = true
-        obj.HealthBarBg.Filled = true
-        obj.HealthBarBg.Color = Color3.fromRGB(10, 10, 10)
-        obj.HealthBar.Filled = true
-        obj.HealthBar.Color = Color3.fromRGB(40, 220, 90)
+        tracer = Drawing.new("Line")
+        tracer.Thickness = 1
+        name = Drawing.new("Text")
+        name.Size = 13
+        name.Center = true
+        name.Outline = true
+        healthBg = Drawing.new("Square")
+        healthBg.Filled = true
+        healthBg.Color = Color3.fromRGB(10, 10, 10)
+        healthBar = Drawing.new("Square")
+        healthBar.Filled = true
+        healthBar.Color = Color3.fromRGB(40, 220, 90)
         for i = 1, 15 do
             local l = Drawing.new("Line")
             l.Thickness = 1.5
-            table.insert(obj.Skeletons, l)
+            table.insert(skeletons, l)
         end
     end
+
+    ESPObjects[plr] = {
+        CornerLines = cornerLines,
+        Tracer = tracer,
+        Name = name,
+        HealthBarBg = healthBg,
+        HealthBar = healthBar,
+        Skeletons = skeletons
+    }
 end
 
 local function HideESPObject(plr)
     local obj = ESPObjects[plr]
-    if not obj then
+    if not obj or not hasDrawing then
         return
     end
-    obj.Box:ClearAllChildren()
-    if hasDrawing then
-        for _, l in ipairs(obj.CornerLines) do
-            l.Visible = false
-        end
-        obj.Tracer.Visible = false
-        obj.Name.Visible = false
-        obj.HealthBarBg.Visible = false
-        obj.HealthBar.Visible = false
-        for _, l in ipairs(obj.Skeletons) do
-            l.Visible = false
-        end
+    for _, l in ipairs(obj.CornerLines) do
+        l.Visible = false
+    end
+    obj.Tracer.Visible = false
+    obj.Name.Visible = false
+    obj.HealthBarBg.Visible = false
+    obj.HealthBar.Visible = false
+    for _, l in ipairs(obj.Skeletons) do
+        l.Visible = false
     end
 end
 
 local function RemoveESPObject(plr)
     local obj = ESPObjects[plr]
-    if not obj then
+    if not obj or not hasDrawing then
         return
     end
-    obj.Box:Destroy()
-    if hasDrawing then
-        for _, l in ipairs(obj.CornerLines) do
-            l:Remove()
-        end
-        obj.Tracer:Remove()
-        obj.Name:Remove()
-        obj.HealthBarBg:Remove()
-        obj.HealthBar:Remove()
-        for _, l in ipairs(obj.Skeletons) do
-            l:Remove()
-        end
+    for _, l in ipairs(obj.CornerLines) do
+        l:Remove()
+    end
+    obj.Tracer:Remove()
+    obj.Name:Remove()
+    obj.HealthBarBg:Remove()
+    obj.HealthBar:Remove()
+    for _, l in ipairs(obj.Skeletons) do
+        l:Remove()
     end
     ESPObjects[plr] = nil
 end
@@ -328,11 +317,13 @@ local function createEsp(player)
         return
     end
     CreateESPObject(player)
+
     local obj = ESPObjects[player]
     local char = player.Character
     local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
     local head = char:FindFirstChild("Head")
     local hum = char:FindFirstChildOfClass("Humanoid")
+
     if not (char and root and head and hum and hum.Health > 0) then
         HideESPObject(player)
         return
@@ -353,40 +344,97 @@ local function createEsp(player)
     local color = getgenv().LunarState.Config.Visuals.BoxColor
     local style = getgenv().LunarState.Config.Visuals.EspStyle
 
-    -- FIXED: Use UDim2.fromOffset for BillboardGui positioning
-    obj.Box:ClearAllChildren()
-    if getgenv().LunarState.ESP then
-        obj.Box.Size = UDim2.fromOffset(width, height)
-        obj.Box.Position = UDim2.fromOffset(topLeftX, topLeftY)
+    -- FIXED: Removed invalid BillboardGui.Position assignment entirely.
+    -- All rendering is now handled exclusively via the safe Drawing API below.
 
+    if hasDrawing and getgenv().LunarState.ESP then
         if style == "Full Box" then
+            -- Draw 4 lines for full box using Drawing API
             local t = 0.05
-            local function addFrame(pos, size)
-                local fr = Instance.new("Frame", obj.Box)
-                fr.Size = UDim2.new(size.X.Scale, size.X.Offset, size.Y.Scale, size.Y.Offset)
-                fr.Position = UDim2.new(pos.X.Scale, pos.X.Offset, pos.Y.Scale, pos.Y.Offset)
-                fr.BackgroundColor3 = color
-                fr.BorderSizePixel = 0
+            local hT = height * t
+            local wT = width * t
+
+            -- Top
+            obj.CornerLines[1].From = Vector2.new(topLeftX, topLeftY)
+            obj.CornerLines[1].To = Vector2.new(topLeftX + width, topLeftY)
+            obj.CornerLines[1].Color = color
+            obj.CornerLines[1].Visible = true
+
+            -- Bottom
+            obj.CornerLines[2].From = Vector2.new(topLeftX, topLeftY + height)
+            obj.CornerLines[2].To = Vector2.new(topLeftX + width, topLeftY + height)
+            obj.CornerLines[2].Color = color
+            obj.CornerLines[2].Visible = true
+
+            -- Left
+            obj.CornerLines[3].From = Vector2.new(topLeftX, topLeftY)
+            obj.CornerLines[3].To = Vector2.new(topLeftX, topLeftY + height)
+            obj.CornerLines[3].Color = color
+            obj.CornerLines[3].Visible = true
+
+            -- Right
+            obj.CornerLines[4].From = Vector2.new(topLeftX + width, topLeftY)
+            obj.CornerLines[4].To = Vector2.new(topLeftX + width, topLeftY + height)
+            obj.CornerLines[4].Color = color
+            obj.CornerLines[4].Visible = true
+
+            -- Hide unused corner lines
+            for i = 5, 8 do
+                obj.CornerLines[i].Visible = false
             end
-            addFrame(UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, t, 0))
-            addFrame(UDim2.new(0, 0, 1 - t, 0), UDim2.new(1, 0, t, 0))
-            addFrame(UDim2.new(0, 0, 0, 0), UDim2.new(t, 0, 1, 0))
-            addFrame(UDim2.new(1 - t, 0, 0, 0), UDim2.new(t, 0, 1, 0))
         elseif style == "Corner Box" then
             local lineLen = math.clamp(width * 0.25, 4, 15)
-            local w = lineLen / width
-            local h = lineLen / height
-            local function addCorner(pos, size)
-                local fr = Instance.new("Frame", obj.Box)
-                fr.Size = UDim2.new(size.X.Scale, size.X.Offset, size.Y.Scale, size.Y.Offset)
-                fr.Position = UDim2.new(pos.X.Scale, pos.X.Offset, pos.Y.Scale, pos.Y.Offset)
-                fr.BackgroundColor3 = color
-                fr.BorderSizePixel = 0
-            end
-            addCorner(UDim2.new(0, 0, 0, 0), UDim2.new(w, 0, h, 0))
-            addCorner(UDim2.new(1 - w, 0, 0, 0), UDim2.new(w, 0, h, 0))
-            addCorner(UDim2.new(0, 0, 1 - h, 0), UDim2.new(w, 0, h, 0))
-            addCorner(UDim2.new(1 - w, 0, 1 - h, 0), UDim2.new(w, 0, h, 0))
+            local topRight = Vector2.new(topLeftX + width, topLeftY)
+            local bottomLeft = Vector2.new(topLeftX, topLeftY + height)
+            local bottomRight = Vector2.new(topLeftX + width, topLeftY + height)
+
+            -- Top Left
+            obj.CornerLines[1].From = Vector2.new(topLeftX, topLeftY)
+            obj.CornerLines[1].To = Vector2.new(topLeftX + lineLen, topLeftY)
+            obj.CornerLines[1].Color = color
+            obj.CornerLines[1].Visible = true
+
+            obj.CornerLines[2].From = Vector2.new(topLeftX, topLeftY)
+            obj.CornerLines[2].To = Vector2.new(topLeftX, topLeftY + lineLen)
+            obj.CornerLines[2].Color = color
+            obj.CornerLines[2].Visible = true
+
+            -- Top Right
+            obj.CornerLines[3].From = topRight
+            obj.CornerLines[3].To = Vector2.new(topRight.X - lineLen, topRight.Y)
+            obj.CornerLines[3].Color = color
+            obj.CornerLines[3].Visible = true
+
+            obj.CornerLines[4].From = topRight
+            obj.CornerLines[4].To = Vector2.new(topRight.X, topRight.Y + lineLen)
+            obj.CornerLines[4].Color = color
+            obj.CornerLines[4].Visible = true
+
+            -- Bottom Left
+            obj.CornerLines[5].From = bottomLeft
+            obj.CornerLines[5].To = Vector2.new(bottomLeft.X + lineLen, bottomLeft.Y)
+            obj.CornerLines[5].Color = color
+            obj.CornerLines[5].Visible = true
+
+            obj.CornerLines[6].From = bottomLeft
+            obj.CornerLines[6].To = Vector2.new(bottomLeft.X, bottomLeft.Y - lineLen)
+            obj.CornerLines[6].Color = color
+            obj.CornerLines[6].Visible = true
+
+            -- Bottom Right
+            obj.CornerLines[7].From = bottomRight
+            obj.CornerLines[7].To = Vector2.new(bottomRight.X - lineLen, bottomRight.Y)
+            obj.CornerLines[7].Color = color
+            obj.CornerLines[7].Visible = true
+
+            obj.CornerLines[8].From = bottomRight
+            obj.CornerLines[8].To = Vector2.new(bottomRight.X, bottomRight.Y - lineLen)
+            obj.CornerLines[8].Color = color
+            obj.CornerLines[8].Visible = true
+        end
+    elseif hasDrawing then
+        for i = 1, 8 do
+            obj.CornerLines[i].Visible = false
         end
     end
 
