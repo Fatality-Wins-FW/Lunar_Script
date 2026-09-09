@@ -20,6 +20,7 @@ getgenv().LunarState = {
     ESP = false,
     Tracers = false,
     Chams = false,
+    Skeleton = false,
     Fly = false,
     Speed = false,
     JumpPower = false,
@@ -39,9 +40,13 @@ getgenv().LunarState = {
             BoxColor = Color3.fromRGB(255, 0, 0),
             TracerColor = Color3.fromRGB(255, 255, 255),
             ChamsColor = Color3.fromRGB(0, 170, 255),
-            EspStyle = "2D Box",
+            EspStyle = "Full Box",
             FovThickness = 1,
             TracerThickness = 2
+        },
+        Keys = {
+            Aimbot = Enum.KeyCode.None,
+            Trigger = Enum.KeyCode.None
         }
     }
 }
@@ -68,6 +73,16 @@ local function SyncUI()
             return v
         end
     end
+end
+
+local function isFeatureActive(featureName)
+    local state = getgenv().LunarState[featureName]
+    local key = getgenv().LunarState.Config.Keys[featureName]
+    if not state then return false end
+    if key ~= Enum.KeyCode.None then
+        return UserInputService:IsKeyDown(key)
+    end
+    return true
 end
 
 local function isEnemy(p)
@@ -146,64 +161,255 @@ local function GetClosestTarget(maxDist)
     return target
 end
 
+local SkeletonBones = {
+    R15 = {
+        {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
+        {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"},
+        {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"},
+        {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"},
+        {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"}
+    },
+    R6 = {
+        {"Head", "Torso"}, {"Torso", "Left Arm"}, {"Torso", "Right Arm"},
+        {"Torso", "Left Leg"}, {"Torso", "Right Leg"}
+    }
+}
+
+local ESPObjects = {}
+
+local function CreateESPObject(plr)
+    if ESPObjects[plr] then return end
+    
+    local cornerLines = {}
+    if hasDrawing then
+        for i = 1, 8 do
+            local line = Drawing.new("Line")
+            line.Thickness = 1.5
+            line.Visible = false
+            table.insert(cornerLines, line)
+        end
+    end
+
+    ESPObjects[plr] = {
+        Box = Instance.new("BillboardGui", plr.Character),
+        CornerLines = cornerLines,
+        Tracer = hasDrawing and Drawing.new("Line") or nil,
+        Name = hasDrawing and Drawing.new("Text") or nil,
+        HealthBarBg = hasDrawing and Drawing.new("Square") or nil,
+        HealthBar = hasDrawing and Drawing.new("Square") or nil,
+        Skeletons = {}
+    }
+
+    local obj = ESPObjects[plr]
+    
+    obj.Box.Name = "LunarEsp"
+    obj.Box.AlwaysOnTop = true
+    local hrp = plr.Character:FindFirstChild("HumanoidRootPart") or plr.Character:FindFirstChild("Torso")
+    if hrp then obj.Box.Adornee = hrp end
+
+    if hasDrawing then
+        obj.Tracer.Thickness = 1
+        obj.Tracer.Visible = false
+
+        obj.Name.Size = 13
+        obj.Name.Center = true
+        obj.Name.Outline = true
+        obj.Name.Visible = false
+
+        obj.HealthBarBg.Filled = true
+        obj.HealthBarBg.Color = Color3.fromRGB(10, 10, 10)
+        obj.HealthBarBg.Visible = false
+
+        obj.HealthBar.Filled = true
+        obj.HealthBar.Color = Color3.fromRGB(40, 220, 90)
+        obj.HealthBar.Visible = false
+
+        for i = 1, 15 do
+            local boneLine = Drawing.new("Line")
+            boneLine.Thickness = 1.5
+            boneLine.Visible = false
+            table.insert(obj.Skeletons, boneLine)
+        end
+    end
+end
+
+local function HideESPObject(plr)
+    local obj = ESPObjects[plr]
+    if not obj then return end
+    
+    obj.Box:ClearAllChildren()
+    
+    if hasDrawing then
+        for _, line in ipairs(obj.CornerLines) do line.Visible = false end
+        obj.Tracer.Visible = false
+        obj.Name.Visible = false
+        obj.HealthBarBg.Visible = false
+        obj.HealthBar.Visible = false
+        for _, line in ipairs(obj.Skeletons) do line.Visible = false end
+    end
+end
+
+local function RemoveESPObject(plr)
+    local obj = ESPObjects[plr]
+    if not obj then return end
+    
+    obj.Box:Destroy()
+    
+    if hasDrawing then
+        for _, line in ipairs(obj.CornerLines) do line:Remove() end
+        obj.Tracer:Remove()
+        obj.Name:Remove()
+        obj.HealthBarBg:Remove()
+        obj.HealthBar:Remove()
+        for _, line in ipairs(obj.Skeletons) do line:Remove() end
+    end
+    
+    ESPObjects[plr] = nil
+end
+
+Players.PlayerRemoving:Connect(RemoveESPObject)
+
 local function createEsp(player)
-    if not player.Character or player.Character:FindFirstChild("LunarEsp") then return end
+    if not player.Character then return end
+    CreateESPObject(player)
     
-    local style = getgenv().LunarState.Config.Visuals.EspStyle
+    local obj = ESPObjects[player]
+    local char = player.Character
+    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+    local head = char:FindFirstChild("Head")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+
+    if not (char and root and head and hum and hum.Health > 0) then
+        HideESPObject(player)
+        return
+    end
+
+    local rootPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+    if not (onScreen and rootPos.Z > 0) then
+        HideESPObject(player)
+        return
+    end
+
+    local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.7, 0))
+    local legPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3.0, 0))
+    local height = math.abs(headPos.Y - legPos.Y)
+    local width = height * 0.6
+    local topLeft = Vector2.new(rootPos.X - width / 2, headPos.Y)
     local color = getgenv().LunarState.Config.Visuals.BoxColor
-    local hrp = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
-    if not hrp then return end
-    
-    local esp = Instance.new("BillboardGui", player.Character)
-    esp.Name = "LunarEsp"
-    esp.AlwaysOnTop = true
-    esp.Adornee = hrp
-    
-    if style == "2D Box" then
-        esp.Size = UDim2.new(4, 0, 5, 0)
-        local t = 0.05
-        local function addFrame(pos, size)
-            local fr = Instance.new("Frame", esp)
-            fr.Size = size
-            fr.Position = pos
-            fr.BackgroundColor3 = color
-            fr.BorderSizePixel = 0
+    local style = getgenv().LunarState.Config.Visuals.EspStyle
+
+    -- BillboardGui Box Fallback (Works on ALL executors)
+    obj.Box:ClearAllChildren()
+    if getgenv().LunarState.ESP then
+        if style == "Full Box" then
+            obj.Box.Size = UDim2.new(0, width, 0, height)
+            obj.Box.Position = UDim2.new(0, topLeft.X, 0, topLeft.Y)
+            local t = 0.05
+            local function addFrame(pos, size)
+                local fr = Instance.new("Frame", obj.Box)
+                fr.Size = UDim2.new(size.X.Scale, size.X.Offset, size.Y.Scale, size.Y.Offset)
+                fr.Position = UDim2.new(pos.X.Scale, pos.X.Offset, pos.Y.Scale, pos.Y.Offset)
+                fr.BackgroundColor3 = color
+                fr.BorderSizePixel = 0
+            end
+            addFrame(UDim2.new(0,0,0,0), UDim2.new(1,0,t,0))
+            addFrame(UDim2.new(0,0,1-t,0), UDim2.new(1,0,t,0))
+            addFrame(UDim2.new(0,0,0,0), UDim2.new(t,0,1,0))
+            addFrame(UDim2.new(1-t,0,0,0), UDim2.new(t,0,1,0))
+            
+        elseif style == "Corner Box" then
+            obj.Box.Size = UDim2.new(0, width, 0, height)
+            obj.Box.Position = UDim2.new(0, topLeft.X, 0, topLeft.Y)
+            local lineLen = math.clamp(width * 0.25, 4, 15)
+            local w = lineLen / width
+            local h = lineLen / height
+            local function addCorner(pos, size)
+                local fr = Instance.new("Frame", obj.Box)
+                fr.Size = UDim2.new(size.X.Scale, size.X.Offset, size.Y.Scale, size.Y.Offset)
+                fr.Position = UDim2.new(pos.X.Scale, pos.X.Offset, pos.Y.Scale, pos.Y.Offset)
+                fr.BackgroundColor3 = color
+                fr.BorderSizePixel = 0
+            end
+            addCorner(UDim2.new(0,0,0,0), UDim2.new(w,0,h,0))
+            addCorner(UDim2.new(0,0,0,0), UDim2.new(w,0,h,0))
+            addCorner(UDim2.new(1-w,0,0,0), UDim2.new(w,0,h,0))
+            addCorner(UDim2.new(1-w,0,0,0), UDim2.new(w,0,h,0))
+            addCorner(UDim2.new(0,0,1-h,0), UDim2.new(w,0,h,0))
+            addCorner(UDim2.new(0,0,1-h,0), UDim2.new(w,0,h,0))
+            addCorner(UDim2.new(1-w,0,1-h,0), UDim2.new(w,0,h,0))
+            addCorner(UDim2.new(1-w,0,1-h,0), UDim2.new(w,0,h,0))
         end
-        addFrame(UDim2.new(0,0,0,0), UDim2.new(1,0,t,0))
-        addFrame(UDim2.new(0,0,1-t,0), UDim2.new(1,0,t,0))
-        addFrame(UDim2.new(0,0,0,0), UDim2.new(t,0,1,0))
-        addFrame(UDim2.new(1-t,0,0,0), UDim2.new(t,0,1,0))
-        
-    elseif style == "Corner" then
-        esp.Size = UDim2.new(4, 0, 5, 0)
-        local t = 0.15
-        local w = 0.04
-        local function addCorner(pos, size)
-            local fr = Instance.new("Frame", esp)
-            fr.Size = size
-            fr.Position = pos
-            fr.BackgroundColor3 = color
-            fr.BorderSizePixel = 0
+    end
+
+    -- Drawing API Features (Only render if executor supports it)
+    if hasDrawing then
+        -- Tracers
+        if getgenv().LunarState.Tracers then
+            obj.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+            obj.Tracer.To = Vector2.new(rootPos.X, rootPos.Y)
+            obj.Tracer.Color = getgenv().LunarState.Config.Visuals.TracerColor
+            obj.Tracer.Thickness = getgenv().LunarState.Config.Visuals.TracerThickness
+            obj.Tracer.Visible = true
+        else
+            obj.Tracer.Visible = false
         end
-        addCorner(UDim2.new(0,0,0,0), UDim2.new(w,0,t,0))
-        addCorner(UDim2.new(0,0,0,0), UDim2.new(t,0,w,0))
-        addCorner(UDim2.new(1-w,0,0,0), UDim2.new(w,0,t,0))
-        addCorner(UDim2.new(1-t,0,0,0), UDim2.new(t,0,w,0))
-        addCorner(UDim2.new(0,0,1-t,0), UDim2.new(w,0,t,0))
-        addCorner(UDim2.new(0,0,1-w,0), UDim2.new(t,0,w,0))
-        addCorner(UDim2.new(1-w,0,1-t,0), UDim2.new(w,0,t,0))
-        addCorner(UDim2.new(1-t,0,1-w,0), UDim2.new(t,0,w,0))
-        
-    elseif style == "Name Tag" then
-        esp.Size = UDim2.new(0, 100, 0, 20)
-        local label = Instance.new("TextLabel", esp)
-        label.Size = UDim2.new(1,0,1,0)
-        label.BackgroundTransparency = 1
-        label.Text = player.Name
-        label.TextColor3 = color
-        label.TextSize = 14
-        label.Font = Enum.Font.GothamBold
-        label.TextStrokeTransparency = 0.5
+
+        -- Names & Distance
+        if getgenv().LunarState.ESP then
+            local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local dist = myHRP and math.floor((myHRP.Position - root.Position).Magnitude) or 0
+            obj.Name.Text = player.Name .. " [" .. dist .. "m]"
+            obj.Name.Position = Vector2.new(rootPos.X, topLeft.Y - 16)
+            obj.Name.Color = Color3.fromRGB(255, 255, 255)
+            obj.Name.Visible = true
+        else
+            obj.Name.Visible = false
+        end
+
+        -- Health Bars
+        if getgenv().LunarState.ESP then
+            local hpPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+            obj.HealthBarBg.Size = Vector2.new(3, height)
+            obj.HealthBarBg.Position = Vector2.new(topLeft.X - 6, topLeft.Y)
+            obj.HealthBarBg.Visible = true
+
+            obj.HealthBar.Size = Vector2.new(3, height * hpPercent)
+            obj.HealthBar.Position = Vector2.new(topLeft.X - 6, topLeft.Y + (height * (1 - hpPercent)))
+            obj.HealthBar.Visible = true
+        else
+            obj.HealthBarBg.Visible = false
+            obj.HealthBar.Visible = false
+        end
+
+        -- Skeleton ESP
+        if getgenv().LunarState.Skeleton then
+            local rigType = (hum.RigType == Enum.HumanoidRigType.R15) and "R15" or "R6"
+            local pairsList = SkeletonBones[rigType]
+            for i, line in ipairs(obj.Skeletons) do
+                if pairsList[i] then
+                    local partA = char:FindFirstChild(pairsList[i][1])
+                    local partB = char:FindFirstChild(pairsList[i][2])
+                    if partA and partB then
+                        local posA, visA = Camera:WorldToViewportPoint(partA.Position)
+                        local posB, visB = Camera:WorldToViewportPoint(partB.Position)
+                        if visA and visB and posA.Z > 0 and posB.Z > 0 then
+                            line.From = Vector2.new(posA.X, posA.Y)
+                            line.To = Vector2.new(posB.X, posB.Y)
+                            line.Color = color
+                            line.Visible = true
+                        else
+                            line.Visible = false
+                        end
+                    else
+                        line.Visible = false
+                    end
+                else
+                    line.Visible = false
+                end
+            end
+        else
+            for _, line in ipairs(obj.Skeletons) do line.Visible = false end
+        end
     end
 end
 
@@ -215,12 +421,20 @@ local SettingsTab = Window:AddTab("Settings")
 
 print("[Lunar] Building Combat Section...")
 local CombatGroup = CombatTab:AddLeftGroupbox("Aimbot")
-CombatGroup:AddToggle("AimbotEnabled", {
+local aimbotToggle = CombatGroup:AddToggle("AimbotEnabled", {
     Text = "Enable Aimbot",
     Callback = function(s) 
         getgenv().LunarState.Aimbot = s 
         if fovCircle then fovCircle.Visible = s end
     end
+})
+aimbotToggle:AddKeyPicker("AimbotKey", {
+    Default = "None",
+    SyncToggleState = false,
+    Mode = "Hold",
+    Text = "Aimbot Key",
+    NoUI = true,
+    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Aimbot = new end
 })
 CombatGroup:AddSlider("AimFOV", {
     Text = "FOV Radius",
@@ -246,9 +460,17 @@ CombatGroup:AddDropdown("HitPart", {
 })
 
 local TriggerGroup = CombatTab:AddRightGroupbox("Triggerbot")
-TriggerGroup:AddToggle("TriggerEnabled", {
+local triggerToggle = TriggerGroup:AddToggle("TriggerEnabled", {
     Text = "Enable Triggerbot",
     Callback = function(s) getgenv().LunarState.Trigger = s end
+})
+triggerToggle:AddKeyPicker("TriggerKey", {
+    Default = "None",
+    SyncToggleState = false,
+    Mode = "Hold",
+    Text = "Trigger Key",
+    NoUI = true,
+    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Trigger = new end
 })
 TriggerGroup:AddSlider("TriggerDelay", {
     Text = "Shot Delay (s)",
@@ -264,19 +486,23 @@ VisualsGroup:AddToggle("ESPEnabled", {
     Callback = function(s) getgenv().LunarState.ESP = s end
 })
 VisualsGroup:AddDropdown("EspStyle", {
-    Text = "ESP Style",
-    Values = {"2D Box", "Corner", "Name Tag"},
+    Text = "Box ESP Style",
+    Values = {"Full Box", "Corner Box"},
     Multi = false,
-    Default = "2D Box",
+    Default = "Full Box",
     Callback = function(v) getgenv().LunarState.Config.Visuals.EspStyle = v end
 })
 VisualsGroup:AddToggle("TracerEnabled", {
-    Text = "Enable Tracers",
+    Text = "Tracers (Snaplines)",
     Callback = function(s) getgenv().LunarState.Tracers = s end
 })
 VisualsGroup:AddToggle("ChamsEnabled", {
-    Text = "Enable Chams",
+    Text = "Chams (Highlight)",
     Callback = function(s) getgenv().LunarState.Chams = s end
+})
+VisualsGroup:AddToggle("SkeletonEnabled", {
+    Text = "Skeleton ESP",
+    Callback = function(s) getgenv().LunarState.Skeleton = s end
 })
 
 local TracerGroup = VisualsTab:AddRightGroupbox("Colors & Thickness")
@@ -466,7 +692,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    if getgenv().LunarState.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+    if isFeatureActive("Aimbot") then
         local target = GetClosestTarget()
         if target and target.Character then
             local partName = getgenv().LunarState.Config.HitPart
@@ -481,7 +707,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    if getgenv().LunarState.Trigger then
+    if isFeatureActive("Trigger") then
         local target = Mouse.Target
         if target then
             local model = target:FindFirstAncestorWhichIsA("Model")
@@ -502,11 +728,7 @@ RunService.RenderStepped:Connect(function()
     local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     for _, p in pairs(Players:GetPlayers()) do
         if isEnemy(p) and p.Character then
-            if getgenv().LunarState.ESP then 
-                createEsp(p)
-            else 
-                if p.Character:FindFirstChild("LunarEsp") then p.Character.LunarEsp:Destroy() end 
-            end
+            createEsp(p)
 
             if getgenv().LunarState.Tracers and hasDrawing then
                 local root = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso")
@@ -525,7 +747,9 @@ RunService.RenderStepped:Connect(function()
                 end
             end
         else
-            if p.Character and p.Character:FindFirstChild("LunarEsp") then p.Character.LunarEsp:Destroy() end
+            if p.Character and ESPObjects[p] then 
+                HideESPObject(p)
+            end
         end
     end
     for i = lIdx, #getgenv().LunarState.Lines do getgenv().LunarState.Lines[i].Visible = false end
