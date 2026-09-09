@@ -348,15 +348,16 @@ local function createEsp(player)
     local legPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
     local height = math.abs(headPos.Y - legPos.Y)
     local width = height * 0.6
-    local topLeft = Vector2.new(rootPos.X - width / 2, headPos.Y)
+    local topLeftX = rootPos.X - width / 2
+    local topLeftY = headPos.Y
     local color = getgenv().LunarState.Config.Visuals.BoxColor
     local style = getgenv().LunarState.Config.Visuals.EspStyle
 
-    -- Fixed BillboardGui Positioning using Offset
+    -- FIXED: Use UDim2.fromOffset for BillboardGui positioning
     obj.Box:ClearAllChildren()
     if getgenv().LunarState.ESP then
-        obj.Box.Size = UDim2.new(0, width, 0, height)
-        obj.Box.Position = UDim2.new(0, topLeft.X, 0, topLeft.Y)
+        obj.Box.Size = UDim2.fromOffset(width, height)
+        obj.Box.Position = UDim2.fromOffset(topLeftX, topLeftY)
 
         if style == "Full Box" then
             local t = 0.05
@@ -411,7 +412,7 @@ local function createEsp(player)
                 text = text .. (text ~= "" and " [" or "[") .. dist .. "m]"
             end
             obj.Name.Text = text
-            obj.Name.Position = Vector2.new(rootPos.X, topLeft.Y - 16)
+            obj.Name.Position = Vector2.new(rootPos.X, topLeftY - 16)
             obj.Name.Color = Color3.fromRGB(255, 255, 255)
             obj.Name.Visible = true
         else
@@ -421,10 +422,10 @@ local function createEsp(player)
         if getgenv().LunarState.HealthBars then
             local hpPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
             obj.HealthBarBg.Size = Vector2.new(3, height)
-            obj.HealthBarBg.Position = Vector2.new(topLeft.X - 6, topLeft.Y)
+            obj.HealthBarBg.Position = Vector2.new(topLeftX - 6, topLeftY)
             obj.HealthBarBg.Visible = true
             obj.HealthBar.Size = Vector2.new(3, height * hpPercent)
-            obj.HealthBar.Position = Vector2.new(topLeft.X - 6, topLeft.Y + (height * (1 - hpPercent)))
+            obj.HealthBar.Position = Vector2.new(topLeftX - 6, topLeftY + (height * (1 - hpPercent)))
             obj.HealthBar.Visible = true
         else
             obj.HealthBarBg.Visible = false
@@ -964,7 +965,7 @@ RunService.RenderStepped:Connect(
                 godConn = nil
             end
 
-            -- Anti Aim / Spin Bot (Allows Movement)
+            -- Anti Aim / Spin Bot (Allows Movement via Relative CFrame)
             if getgenv().LunarState.AntiAim or getgenv().LunarState.SpinBot then
                 if not aaConn then
                     aaConn =
@@ -972,7 +973,7 @@ RunService.RenderStepped:Connect(
                         function()
                             local hrp = Character:FindFirstChild("HumanoidRootPart")
                             if hrp then
-                                -- Apply rotation relative to current CFrame so WASD still works
+                                -- Multiply current CFrame by rotation so WASD still applies to base orientation
                                 if getgenv().LunarState.SpinBot then
                                     hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(tick() * 500), 0)
                                 end
