@@ -161,39 +161,12 @@ local function shoot()
     end)
 end
 
-local function fetchWithRetry(name, url, maxAttempts)
-    print(string.format("[Lunar] Loading %s...", name))
-    local result, success = nil, false
-    
-    for attempt = 1, maxAttempts do
-        print(string.format("[Lunar] %s - Attempt %d/%d", name, attempt, maxAttempts))
-        local ok, res = pcall(function()
-            local content = game:HttpGet(url, true)
-            if not content or #content < 100 then
-                error("Empty or invalid response from server")
-            end
-            return loadstring(content)()
-        end)
-        
-        if ok and res and type(res) == "table" then
-            result = res
-            success = true
-            print(string.format("[Lunar] ✅ %s loaded successfully on attempt %d!", name, attempt))
-            break
-        else
-            warn(string.format("[Lunar] ❌ %s failed (Attempt %d/%d): %s", name, attempt, maxAttempts, tostring(res)))
-            if attempt < maxAttempts then task.wait(2) end
-        end
-    end
-    
-    if not success then
-        error(string.format("[Lunar] CRITICAL: Failed to load %s after %d attempts. Script halted.", name, maxAttempts))
-    end
-    
-    return result
-end
+-- FIXED LOADER: Standard LinoriaLib + Addons Loading
+print("[Lunar] Loading UI Libraries...")
+local Library = loadstring(game:HttpGet("https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet("https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/addons/SaveManager.lua"))()
 
-local Library = fetchWithRetry("UI Library", "https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/Library.lua", 3)
 Library:SetWatermarkVisibility(false)
 
 local Window = Library:CreateWindow({
@@ -235,6 +208,7 @@ local function createEsp(player)
     esp.AlwaysOnTop = true
     esp.Adornee = hrp
     
+    -- FIXED: Removed invalid .Position assignment. BillboardGuis follow Adornee automatically.
     if style == "2D Box" then
         esp.Size = UDim2.new(4, 0, 5, 0)
         local t = 0.05
@@ -287,7 +261,7 @@ local function safeAdd(groupbox, method, ...)
         return groupbox[method](groupbox, ...)
     end)
     if not ok then
-        warn(string.format("[Lunar] ️ Skipped '%s': %s", method, tostring(res)))
+        warn(string.format("[Lunar] ⚠️ Skipped '%s': %s", method, tostring(res)))
     end
     return res
 end
@@ -464,31 +438,15 @@ safeAdd(MiscGroup, "AddButton", "UnloadBtn", "Unload Script", function()
 end)
 
 print("[Lunar] Building Settings Section...")
+-- INTEGRATED THEME & SAVE MANAGERS
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({"MenuKeybind"})
+ThemeManager:SetFolder("LunarArsenal")
+SaveManager:SetFolder("LunarArsenal")
+
 local ConfigGroup = SettingsTab:AddLeftGroupbox("Configuration")
-safeAdd(ConfigGroup, "AddButton", "SaveConfigBtn", "Save Config", function()
-    pcall(function()
-        writefile("LunarArsenal_Config.json", HttpService:JSONEncode(getgenv().LunarState.Config))
-        Library:Notify("Config Saved!")
-    end)
-end)
-safeAdd(ConfigGroup, "AddButton", "LoadConfigBtn", "Load Config", function()
-    pcall(function()
-        local data = readfile("LunarArsenal_Config.json")
-        local decoded = HttpService:JSONDecode(data)
-        for k,v in pairs(decoded) do getgenv().LunarState.Config[k] = v end
-        if fovCircle then
-            fovCircle.Color = getgenv().LunarState.Config.Visuals.AimbotFovColor
-            fovCircle.Radius = getgenv().LunarState.Config.AimFOV
-            fovCircle.Thickness = getgenv().LunarState.Config.Visuals.FovThickness
-        end
-        if silentFovCircle then
-            silentFovCircle.Color = getgenv().LunarState.Config.Visuals.SilentFovColor
-            silentFovCircle.Radius = getgenv().LunarState.Config.SilentFOV
-            silentFovCircle.Thickness = getgenv().LunarState.Config.Visuals.FovThickness
-        end
-        Library:Notify("Config Loaded!")
-    end)
-end)
 safeAdd(ConfigGroup, "AddButton", "ResetConfigBtn", "Reset Config", function()
     getgenv().LunarState.Config = {
         AimFOV = 150, AimSmoothness = 0.2, AimPart = "Head", TriggerDelay = 0.025,
@@ -514,6 +472,10 @@ safeAdd(ConfigGroup, "AddButton", "ResetConfigBtn", "Reset Config", function()
     end
     Library:Notify("Config Reset!")
 end)
+
+-- Apply ThemeManager and SaveManager to Settings Tab
+ThemeManager:ApplyToTab(SettingsTab)
+SaveManager:BuildConfigSection(SettingsTab)
 
 print("[Lunar] Starting Runtime Loops...")
 local frameSkip = 0
