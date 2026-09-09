@@ -20,7 +20,8 @@ getgenv().LunarState = {
     Rage = false,
     Aimbot = false,
     Trigger = false,
-    Silent = false,
+    SilentLegacy = false,
+    SilentRenewed = false,
     ESP = false,
     Tracers = false,
     Ammo = false,
@@ -58,7 +59,8 @@ getgenv().LunarState = {
         Keys = {
             Aimbot = Enum.KeyCode.None,
             Trigger = Enum.KeyCode.None,
-            Silent = Enum.KeyCode.None,
+            SilentLegacy = Enum.KeyCode.None,
+            SilentRenewed = Enum.KeyCode.None,
             Rage = Enum.KeyCode.None
         }
     }
@@ -256,16 +258,88 @@ local function createEsp(player)
     end
 end
 
-local function safeAdd(groupbox, method, ...)
-    local args = {...}
-    local ok, res = pcall(function()
-        return groupbox[method](groupbox, unpack(args))
-    end)
-    if not ok then
-        warn(string.format("[Lunar] ⚠️ Skipped '%s': %s", method, tostring(res)))
+-- SILENT AIM RENEWED LOGIC
+local renewedSilentTarget = nil
+local renewedHookActive = false
+
+local function isVisible(target)
+    local origin = Camera.CFrame
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {LocalPlayer.Character}
+    params.IgnoreWater = true
+    local direction = (target.Position - origin.Position)
+    local result = workspace:Raycast(origin.Position, direction, params)
+    if result then
+        return Players:GetPlayerFromCharacter(result.Instance:FindFirstAncestorOfClass("Model")) ~= nil
+    else
+        return true
     end
-    return res
 end
+
+local function GetClosestPlayerSilent()
+    local closestDistance = math.huge
+    local closest = nil
+    for _, v in pairs(Players:GetPlayers()) do
+        if v == LocalPlayer then continue end
+        local char = v.Character
+        if not char then continue end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then continue end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then continue end
+        local myteam = LocalPlayer.Team and LocalPlayer.Team.Name
+        local theirTeam = v.Team and v.Team.Name
+        if myteam == theirTeam then continue end
+        local head = char:FindFirstChild("Head")
+        if not head then continue end
+        local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+        if onScreen then
+            local distance = (Vector2.new(screenPos.X, screenPos.Y) - Camera.ViewportSize / 2).Magnitude
+            if distance < closestDistance then
+                if not isVisible(head) then continue end
+                closestDistance = distance
+                closest = head
+            end
+        end
+    end
+    return closest
+end
+
+RunService.RenderStepped:Connect(function()
+    if isFeatureActive("SilentRenewed") then
+        renewedSilentTarget = GetClosestPlayerSilent()
+    else
+        renewedSilentTarget = nil
+    end
+end)
+
+-- Hook GC closures for Silent Aim Renewed
+task.spawn(function()
+    task.wait(2)
+    for i, v in pairs(getgc()) do   
+        if type(v) == "function" and islclosure(v) then
+            if debug.info(v, "a") == 2 and #debug.getupvalues(v) == 2 and #debug.getconstants(v) == 17 and debug.info(v,"n"):len() <= 10 then
+                local old
+                old = hookfunction(v, function(p1,p2)
+                    if renewedSilentTarget and renewedSilentTarget.Position then
+                        local mychar = LocalPlayer.Character
+                        if mychar then
+                            local head = mychar:FindFirstChild("Head")
+                            if head then
+                                local direction = (renewedSilentTarget.Position - head.Position) 
+                                p1 = Ray.new(head.Position, direction)
+                            end 
+                        end 
+                    end 
+                    return old(p1,p2)
+                end)
+                renewedHookActive = true
+                break
+            end 
+        end 
+    end 
+end)
 
 print("[Lunar] Creating UI Tabs...")
 local CombatTab = Window:AddTab("Combat")
@@ -277,14 +351,22 @@ local SettingsTab = Window:AddTab("Settings")
 
 print("[Lunar] Building Combat Section...")
 local CombatGroup = CombatTab:AddLeftGroupbox("Aimbot")
-safeAdd(CombatGroup, "AddToggle", "AimbotEnabled", {
+local aimbotToggle = CombatGroup:AddToggle("AimbotEnabled", {
     Text = "Enable Aimbot",
     Callback = function(s) 
         getgenv().LunarState.Aimbot = s 
         if fovCircle then fovCircle.Visible = s end
     end
 })
-safeAdd(CombatGroup, "AddSlider", "AimFOV", {
+aimbotToggle:AddKeyPicker("AimbotKey", {
+    Default = "None",
+    SyncToggleState = false,
+    Mode = "Hold",
+    Text = "Aimbot Key",
+    NoUI = true,
+    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Aimbot = new end
+})
+CombatGroup:AddSlider("AimFOV", {
     Text = "FOV Radius",
     Min = 10, Max = 500, Default = 150,
     Rounding = 0,
@@ -293,13 +375,13 @@ safeAdd(CombatGroup, "AddSlider", "AimFOV", {
         if fovCircle then fovCircle.Radius = v end
     end
 })
-safeAdd(CombatGroup, "AddSlider", "AimSmooth", {
+CombatGroup:AddSlider("AimSmooth", {
     Text = "Smoothness (0-1)",
     Min = 0, Max = 1, Default = 0.2,
     Rounding = 2,
     Callback = function(v) getgenv().LunarState.Config.AimSmoothness = v end
 })
-safeAdd(CombatGroup, "AddDropdown", "AimPart", {
+CombatGroup:AddDropdown("AimPart", {
     Text = "Target Part",
     Values = {"Head", "HumanoidRootPart", "UpperTorso"},
     Multi = false,
@@ -309,11 +391,19 @@ safeAdd(CombatGroup, "AddDropdown", "AimPart", {
 
 print("[Lunar] Building Triggerbot Section...")
 local TriggerGroup = CombatTab:AddRightGroupbox("Triggerbot")
-safeAdd(TriggerGroup, "AddToggle", "TriggerEnabled", {
+local triggerToggle = TriggerGroup:AddToggle("TriggerEnabled", {
     Text = "Enable Triggerbot",
     Callback = function(s) getgenv().LunarState.Trigger = s end
 })
-safeAdd(TriggerGroup, "AddSlider", "TriggerDelay", {
+triggerToggle:AddKeyPicker("TriggerKey", {
+    Default = "None",
+    SyncToggleState = false,
+    Mode = "Hold",
+    Text = "Trigger Key",
+    NoUI = true,
+    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Trigger = new end
+})
+TriggerGroup:AddSlider("TriggerDelay", {
     Text = "Shot Delay (s)",
     Min = 0, Max = 0.5, Default = 0.025,
     Rounding = 3,
@@ -322,14 +412,39 @@ safeAdd(TriggerGroup, "AddSlider", "TriggerDelay", {
 
 print("[Lunar] Building Silent Aim Section...")
 local SilentGroup = CombatTab:AddRightGroupbox("Silent Aim")
-safeAdd(SilentGroup, "AddToggle", "SilentEnabled", {
-    Text = "Enable Silent Aim",
+local silentLegacyToggle = SilentGroup:AddToggle("SilentLegacyEnabled", {
+    Text = "Silent Aim (Legacy)",
     Callback = function(state)
-        getgenv().LunarState.Silent = state
+        getgenv().LunarState.SilentLegacy = state
         if silentFovCircle then silentFovCircle.Visible = state end
     end
 })
-safeAdd(SilentGroup, "AddSlider", "SilentFOV", {
+silentLegacyToggle:AddKeyPicker("SilentLegacyKey", {
+    Default = "None",
+    SyncToggleState = false,
+    Mode = "Hold",
+    Text = "Legacy Key",
+    NoUI = true,
+    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.SilentLegacy = new end
+})
+
+local silentRenewedToggle = SilentGroup:AddToggle("SilentRenewedEnabled", {
+    Text = "Silent Aim (Renewed)",
+    Callback = function(state)
+        getgenv().LunarState.SilentRenewed = state
+        if silentFovCircle then silentFovCircle.Visible = state end
+    end
+})
+silentRenewedToggle:AddKeyPicker("SilentRenewedKey", {
+    Default = "None",
+    SyncToggleState = false,
+    Mode = "Hold",
+    Text = "Renewed Key",
+    NoUI = true,
+    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.SilentRenewed = new end
+})
+
+SilentGroup:AddSlider("SilentFOV", {
     Text = "Silent FOV",
     Min = 10, Max = 500, Default = 200,
     Rounding = 0,
@@ -341,17 +456,25 @@ safeAdd(SilentGroup, "AddSlider", "SilentFOV", {
 
 print("[Lunar] Building Rage Section...")
 local RageGroup = RageTab:AddLeftGroupbox("Rage Configuration")
-safeAdd(RageGroup, "AddToggle", "RageEnabled", {
+local rageToggle = RageGroup:AddToggle("RageEnabled", {
     Text = "Enable Ragebot",
     Callback = function(s) getgenv().LunarState.Rage = s end
 })
-safeAdd(RageGroup, "AddSlider", "RageSpin", {
+rageToggle:AddKeyPicker("RageKey", {
+    Default = "None",
+    SyncToggleState = false,
+    Mode = "Hold",
+    Text = "Rage Key",
+    NoUI = true,
+    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Rage = new end
+})
+RageGroup:AddSlider("RageSpin", {
     Text = "Spin Speed",
     Min = 0, Max = 100, Default = 30,
     Rounding = 0,
     Callback = function(v) getgenv().LunarState.Config.RageSpinSpeed = v end
 })
-safeAdd(RageGroup, "AddSlider", "RageHeight", {
+RageGroup:AddSlider("RageHeight", {
     Text = "Teleport Height",
     Min = 0, Max = 20, Default = 9,
     Rounding = 0,
@@ -360,11 +483,11 @@ safeAdd(RageGroup, "AddSlider", "RageHeight", {
 
 print("[Lunar] Building Visuals Section...")
 local VisualsGroup = VisualsTab:AddLeftGroupbox("ESP Options")
-safeAdd(VisualsGroup, "AddToggle", "ESPEnabled", {
+VisualsGroup:AddToggle("ESPEnabled", {
     Text = "Enable ESP",
     Callback = function(s) getgenv().LunarState.ESP = s end
 })
-safeAdd(VisualsGroup, "AddDropdown", "EspStyle", {
+VisualsGroup:AddDropdown("EspStyle", {
     Text = "ESP Style",
     Values = {"2D Box", "3D Box", "Corner"},
     Multi = false,
@@ -373,11 +496,11 @@ safeAdd(VisualsGroup, "AddDropdown", "EspStyle", {
 })
 
 local TracerGroup = VisualsTab:AddRightGroupbox("Tracers")
-safeAdd(TracerGroup, "AddToggle", "TracerEnabled", {
+TracerGroup:AddToggle("TracerEnabled", {
     Text = "Enable Tracers",
     Callback = function(s) getgenv().LunarState.Tracers = s end
 })
-safeAdd(TracerGroup, "AddSlider", "TracerThickness", {
+TracerGroup:AddSlider("TracerThickness", {
     Text = "Tracer Thickness",
     Min = 1, Max = 5, Default = 2,
     Rounding = 0,
@@ -386,33 +509,33 @@ safeAdd(TracerGroup, "AddSlider", "TracerThickness", {
 
 print("[Lunar] Building Gun Mods Section...")
 local ModsGroup = ModsTab:AddLeftGroupbox("Weapon Tweaks")
-safeAdd(ModsGroup, "AddToggle", "AmmoEnabled", {
+ModsGroup:AddToggle("AmmoEnabled", {
     Text = "Infinite Ammo",
     Callback = function(s) getgenv().LunarState.Ammo = s end
 })
-safeAdd(ModsGroup, "AddToggle", "AccEnabled", {
+ModsGroup:AddToggle("AccEnabled", {
     Text = "100% Accuracy",
     Callback = function(s) getgenv().LunarState.Acc = s end
 })
-safeAdd(ModsGroup, "AddToggle", "FireRateEnabled", {
+ModsGroup:AddToggle("FireRateEnabled", {
     Text = "Custom Fire Rate",
     Callback = function(s) getgenv().LunarState.FireRate = s end
 })
-safeAdd(ModsGroup, "AddSlider", "FireRateVal", {
+ModsGroup:AddSlider("FireRateVal", {
     Text = "Fire Rate (s)",
     Min = 0.01, Max = 1, Default = 0.05,
     Rounding = 3,
     Callback = function(v) getgenv().LunarState.Config.FireRateVal = v end
 })
-safeAdd(ModsGroup, "AddToggle", "AutoEnabled", {
+ModsGroup:AddToggle("AutoEnabled", {
     Text = "All Automatic",
     Callback = function(s) getgenv().LunarState.Auto = s end
 })
-safeAdd(ModsGroup, "AddToggle", "WallbangEnabled", {
+ModsGroup:AddToggle("WallbangEnabled", {
     Text = "Wallbang",
     Callback = function(s) getgenv().LunarState.WallBang = s end
 })
-safeAdd(ModsGroup, "AddSlider", "PenetrationVal", {
+ModsGroup:AddSlider("PenetrationVal", {
     Text = "Penetration Power",
     Min = 1, Max = 500, Default = 100,
     Rounding = 0,
@@ -421,15 +544,15 @@ safeAdd(ModsGroup, "AddSlider", "PenetrationVal", {
 
 print("[Lunar] Building Misc Section...")
 local MiscGroup = MiscTab:AddLeftGroupbox("Utilities")
-safeAdd(MiscGroup, "AddToggle", "NoAnimsEnabled", {
+MiscGroup:AddToggle("NoAnimsEnabled", {
     Text = "No Animations",
     Callback = function(s) getgenv().LunarState.NoAnims = s end
 })
-safeAdd(MiscGroup, "AddToggle", "AutoInspectEnabled", {
+MiscGroup:AddToggle("AutoInspectEnabled", {
     Text = "Auto Inspect",
     Callback = function(s) getgenv().LunarState.AutoInspect = s end
 })
-safeAdd(MiscGroup, "AddButton", "UnloadBtn", "Unload Script", function()
+MiscGroup:AddButton("UnloadBtn", "Unload Script", function()
     getgenv().LunarRunning = false
     for _, l in pairs(getgenv().LunarState.Lines) do l:Remove() end
     if fovCircle then fovCircle:Remove() end
@@ -448,7 +571,7 @@ ThemeManager:SetFolder("LunarArsenal")
 SaveManager:SetFolder("LunarArsenal")
 
 local ConfigGroup = SettingsTab:AddLeftGroupbox("Configuration")
-safeAdd(ConfigGroup, "AddButton", "ResetConfigBtn", "Reset Config", function()
+ConfigGroup:AddButton("ResetConfigBtn", "Reset Config", function()
     getgenv().LunarState.Config = {
         AimFOV = 150, AimSmoothness = 0.2, AimPart = "Head", TriggerDelay = 0.025,
         RageSpinSpeed = 30, RageHeight = 9, FireRateVal = 0.05, PenetrationVal = 100,
@@ -459,7 +582,7 @@ safeAdd(ConfigGroup, "AddButton", "ResetConfigBtn", "Reset Config", function()
             EspBoxColor = Color3.fromRGB(255,0,0), TracerColor = Color3.fromRGB(255,0,0),
             FovThickness = 1, TracerThickness = 2, EspStyle = "2D Box"
         },
-        Keys = {Aimbot = Enum.KeyCode.None, Trigger = Enum.KeyCode.None, Silent = Enum.KeyCode.None, Rage = Enum.KeyCode.None}
+        Keys = {Aimbot = Enum.KeyCode.None, Trigger = Enum.KeyCode.None, SilentLegacy = Enum.KeyCode.None, SilentRenewed = Enum.KeyCode.None, Rage = Enum.KeyCode.None}
     }
     if fovCircle then
         fovCircle.Color = getgenv().LunarState.Config.Visuals.AimbotFovColor
@@ -504,17 +627,13 @@ RunService.RenderStepped:Connect(function()
         end)
     end
 
+    -- FIXED: Proper keybind + MB2 check for Aimbot
     local aimbotActive = isFeatureActive("Aimbot")
     local hasKeybind = getgenv().LunarState.Config.Keys.Aimbot ~= Enum.KeyCode.None
     local mb2Pressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
     
     if aimbotActive and not isFeatureActive("Rage") then
-        local shouldAim = false
-        if hasKeybind then
-            shouldAim = mb2Pressed
-        else
-            shouldAim = true
-        end
+        local shouldAim = hasKeybind and mb2Pressed or (not hasKeybind)
         
         if shouldAim then
             local target = GetClosestTarget()
@@ -528,6 +647,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- FIXED: Proper keybind check for Triggerbot
     if isFeatureActive("Trigger") then
         local target = Mouse.Target
         if target then
@@ -543,10 +663,11 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- FIXED: Bottom-center tracers instead of center
     if frameSkip % 2 ~= 0 then return end
 
     local lIdx = 1
-    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    local tracerOrigin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
     for _, p in pairs(Players:GetPlayers()) do
         if isEnemy(p) and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             if getgenv().LunarState.ESP then 
@@ -562,7 +683,7 @@ RunService.RenderStepped:Connect(function()
                     l.Visible = true
                     l.Thickness = getgenv().LunarState.Config.Visuals.TracerThickness
                     l.Color = getgenv().LunarState.Config.Visuals.TracerColor
-                    l.From = center
+                    l.From = tracerOrigin
                     l.To = Vector2.new(pos.X, pos.Y)
                     getgenv().LunarState.Lines[lIdx] = l
                     lIdx = lIdx + 1
