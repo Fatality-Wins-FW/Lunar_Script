@@ -42,10 +42,6 @@ getgenv().LunarState = {
             EspStyle = "2D Box",
             FovThickness = 1,
             TracerThickness = 2
-        },
-        Keys = {
-            Aimbot = Enum.KeyCode.None,
-            Trigger = Enum.KeyCode.None
         }
     }
 }
@@ -72,16 +68,6 @@ local function SyncUI()
             return v
         end
     end
-end
-
-local function isFeatureActive(featureName)
-    local state = getgenv().LunarState[featureName]
-    local key = getgenv().LunarState.Config.Keys[featureName]
-    if not state then return false end
-    if key ~= Enum.KeyCode.None then
-        return UserInputService:IsKeyDown(key)
-    end
-    return true
 end
 
 local function isEnemy(p)
@@ -229,20 +215,12 @@ local SettingsTab = Window:AddTab("Settings")
 
 print("[Lunar] Building Combat Section...")
 local CombatGroup = CombatTab:AddLeftGroupbox("Aimbot")
-local aimbotToggle = CombatGroup:AddToggle("AimbotEnabled", {
+CombatGroup:AddToggle("AimbotEnabled", {
     Text = "Enable Aimbot",
     Callback = function(s) 
         getgenv().LunarState.Aimbot = s 
         if fovCircle then fovCircle.Visible = s end
     end
-})
-aimbotToggle:AddKeyPicker("AimbotKey", {
-    Default = "None",
-    SyncToggleState = false,
-    Mode = "Hold",
-    Text = "Aimbot Key",
-    NoUI = true,
-    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Aimbot = new end
 })
 CombatGroup:AddSlider("AimFOV", {
     Text = "FOV Radius",
@@ -268,17 +246,9 @@ CombatGroup:AddDropdown("HitPart", {
 })
 
 local TriggerGroup = CombatTab:AddRightGroupbox("Triggerbot")
-local triggerToggle = TriggerGroup:AddToggle("TriggerEnabled", {
+TriggerGroup:AddToggle("TriggerEnabled", {
     Text = "Enable Triggerbot",
     Callback = function(s) getgenv().LunarState.Trigger = s end
-})
-triggerToggle:AddKeyPicker("TriggerKey", {
-    Default = "None",
-    SyncToggleState = false,
-    Mode = "Hold",
-    Text = "Trigger Key",
-    NoUI = true,
-    ChangedCallback = function(new) getgenv().LunarState.Config.Keys.Trigger = new end
 })
 TriggerGroup:AddSlider("TriggerDelay", {
     Text = "Shot Delay (s)",
@@ -496,7 +466,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    if isFeatureActive("Aimbot") then
+    if getgenv().LunarState.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local target = GetClosestTarget()
         if target and target.Character then
             local partName = getgenv().LunarState.Config.HitPart
@@ -511,7 +481,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    if isFeatureActive("Trigger") then
+    if getgenv().LunarState.Trigger then
         local target = Mouse.Target
         if target then
             local model = target:FindFirstAncestorWhichIsA("Model")
