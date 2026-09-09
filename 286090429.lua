@@ -257,8 +257,9 @@ local function createEsp(player)
 end
 
 local function safeAdd(groupbox, method, ...)
+    local args = {...}
     local ok, res = pcall(function()
-        return groupbox[method](groupbox, ...)
+        return groupbox[method](groupbox, unpack(args))
     end)
     if not ok then
         warn(string.format("[Lunar] ⚠️ Skipped '%s': %s", method, tostring(res)))
