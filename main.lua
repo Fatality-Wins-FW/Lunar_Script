@@ -5,58 +5,69 @@ local supported_games = {
     ["Universal"] = "https://raw.githubusercontent.com/Fatality-Wins-FW/Lunar_Script/main/universal.lua",
 }
 
+local function validateLuaContent(content, label)
+    if not content or #content < 50 then
+        return false, string.format("Empty response (Length: %d)", content and #content or 0)
+    end
+    
+    if string.find(content, "<!DOCTYPE") or string.find(content, "<html") then
+        return false, "Received HTML page instead of Lua"
+    end
+    
+    if string.find(content, "404: Not Found") or string.find(content, "Not Found") then
+        return false, "File not found on repository"
+    end
+    
+    local func, err = loadstring(content)
+    if not func then
+        return false, string.format("Syntax error: %s", tostring(err))
+    end
+    
+    return true, func
+end
+
 local function loadScript(url, label, maxRetries)
     maxRetries = maxRetries or 3
     
     for attempt = 1, maxRetries do
         print(string.format("[Loader] Loading %s (Attempt %d/%d)...", label, attempt, maxRetries))
         
-        local success, result = pcall(function()
+        local success, content = pcall(function()
             return game:HttpGet(url, true)
         end)
-
+        
         if not success then
-            warn(string.format("[Loader] ❌ Network error fetching %s: %s", label, tostring(result)))
-            if attempt < maxRetries then task.wait(2) end
-            continue
-        end
-
-        if not result or #result < 50 then
-            warn(string.format("[Loader] ❌ Empty response for %s (Length: %d)", label, result and #result or 0))
+            warn(string.format("[Loader] ❌ Network error: %s", tostring(content)))
             if attempt < maxRetries then task.wait(2) end
             continue
         end
         
-        if string.find(result, "<!DOCTYPE") or string.find(result, "<html") or string.find(result, "404: Not Found") then
-            warn(string.format("[Loader] ❌ Received HTML/error page instead of Lua for %s", label))
+        local isValid, result = validateLuaContent(content, label)
+        
+        if not isValid then
+            warn(string.format("[Loader] ❌ Validation failed: %s", result))
             if attempt < maxRetries then task.wait(2) end
             continue
         end
-
-        local func, syntaxErr = loadstring(result)
-        if not func then
-            warn(string.format("[Loader] ❌ Invalid Lua syntax in %s: %s", label, tostring(syntaxErr)))
-            return
-        end
-
-        local execSuccess, execErr = pcall(func)
+        
+        local execSuccess, execErr = pcall(result)
         if execSuccess then
             print(string.format("[Loader] ✅ %s loaded successfully!", label))
             return
         else
-            warn(string.format("[Loader] ❌ %s execution failed: %s", label, tostring(execErr)))
+            warn(string.format("[Loader] ❌ Execution failed: %s", tostring(execErr)))
             return
         end
     end
     
-    warn(string.format("[Loader] ❌ Failed to load %s after %d attempts", label, maxRetries))
+    warn(string.format("[Loader] ❌ Failed after %d attempts", maxRetries))
 end
 
 local placeId = tostring(game.PlaceId)
 local targetUrl = supported_games[placeId] or supported_games["Universal"]
 
 if not targetUrl then
-    warn("[Loader] ❌ No script URL found for this game and no Universal fallback defined.")
+    warn("[Loader] ❌ No script URL configured for this game")
     return
 end
 
