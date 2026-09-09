@@ -238,7 +238,6 @@ local function CreateESPObject(plr)
         return
     end
 
-    -- Initialize Drawing objects safely
     local cornerLines, tracer, name, healthBg, healthBar, skeletons = {}, nil, nil, nil, nil, {}
     if hasDrawing then
         for i = 1, 8 do
@@ -440,6 +439,7 @@ local function createEsp(player)
 
     if hasDrawing then
         if getgenv().LunarState.Tracers then
+            -- FIXED: Tracers now originate from BOTTOM-CENTER of screen, not middle
             obj.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
             obj.Tracer.To = Vector2.new(rootPos.X, rootPos.Y)
             obj.Tracer.Color = getgenv().LunarState.Config.Visuals.TracerColor
@@ -1130,7 +1130,8 @@ RunService.RenderStepped:Connect(
             return
         end
         local lIdx = 1
-        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        -- FIXED: Tracer origin is now bottom-center of screen
+        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
         for _, p in pairs(Players:GetPlayers()) do
             if isEnemy(p) and p.Character then
                 createEsp(p)
