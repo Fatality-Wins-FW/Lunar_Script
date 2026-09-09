@@ -260,7 +260,6 @@ end
 
 -- SILENT AIM RENEWED LOGIC
 local renewedSilentTarget = nil
-local renewedHookActive = false
 
 local function isVisible(target)
     local origin = Camera.CFrame
@@ -334,7 +333,6 @@ task.spawn(function()
                     end 
                     return old(p1,p2)
                 end)
-                renewedHookActive = true
                 break
             end 
         end 
@@ -552,7 +550,8 @@ MiscGroup:AddToggle("AutoInspectEnabled", {
     Text = "Auto Inspect",
     Callback = function(s) getgenv().LunarState.AutoInspect = s end
 })
-MiscGroup:AddButton("UnloadBtn", "Unload Script", function()
+-- FIXED: AddButton(name, callback) - no text parameter
+MiscGroup:AddButton("Unload Script", function()
     getgenv().LunarRunning = false
     for _, l in pairs(getgenv().LunarState.Lines) do l:Remove() end
     if fovCircle then fovCircle:Remove() end
@@ -562,7 +561,6 @@ MiscGroup:AddButton("UnloadBtn", "Unload Script", function()
 end)
 
 print("[Lunar] Building Settings Section...")
--- INTEGRATED THEME & SAVE MANAGERS
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
@@ -571,7 +569,8 @@ ThemeManager:SetFolder("LunarArsenal")
 SaveManager:SetFolder("LunarArsenal")
 
 local ConfigGroup = SettingsTab:AddLeftGroupbox("Configuration")
-ConfigGroup:AddButton("ResetConfigBtn", "Reset Config", function()
+-- FIXED: AddButton(name, callback) - no text parameter
+ConfigGroup:AddButton("Reset Config", function()
     getgenv().LunarState.Config = {
         AimFOV = 150, AimSmoothness = 0.2, AimPart = "Head", TriggerDelay = 0.025,
         RageSpinSpeed = 30, RageHeight = 9, FireRateVal = 0.05, PenetrationVal = 100,
@@ -597,7 +596,6 @@ ConfigGroup:AddButton("ResetConfigBtn", "Reset Config", function()
     Library:Notify("Config Reset!")
 end)
 
--- Apply ThemeManager and SaveManager to Settings Tab
 ThemeManager:ApplyToTab(SettingsTab)
 SaveManager:BuildConfigSection(SettingsTab)
 
