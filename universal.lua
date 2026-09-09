@@ -3,9 +3,7 @@ print("[Lunar] Initializing Universal Script...")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui")
-local VIM = game:GetService("VirtualInputManager")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -19,11 +17,9 @@ getgenv().LunarRunning = true
 getgenv().LunarState = {
     Aimbot = false,
     Trigger = false,
-    Silent = false,
     ESP = false,
     Tracers = false,
     Chams = false,
-    Skeleton = false,
     Fly = false,
     Speed = false,
     JumpPower = false,
@@ -36,7 +32,7 @@ getgenv().LunarState = {
         HitPart = "Head",
         TriggerDelay = 0.025,
         WalkSpeed = 16,
-        JumpPower = 50,
+        JumpPowerVal = 50,
         FlySpeed = 50,
         Gravity = 196,
         Visuals = {
@@ -312,10 +308,6 @@ VisualsGroup:AddToggle("ChamsEnabled", {
     Text = "Enable Chams",
     Callback = function(s) getgenv().LunarState.Chams = s end
 })
-VisualsGroup:AddToggle("SkeletonEnabled", {
-    Text = "Enable Skeleton",
-    Callback = function(s) getgenv().LunarState.Skeleton = s end
-})
 
 local TracerGroup = VisualsTab:AddRightGroupbox("Colors & Thickness")
 TracerGroup:AddSlider("TracerThickness", {
@@ -347,7 +339,7 @@ MiscGroup:AddSlider("JumpPower", {
     Text = "Jump Power",
     Min = 50, Max = 350, Default = 50,
     Rounding = 0,
-    Callback = function(v) getgenv().LunarState.Config.JumpPower = v end
+    Callback = function(v) getgenv().LunarState.Config.JumpPowerVal = v end
 })
 MiscGroup:AddSlider("Gravity", {
     Text = "Gravity",
@@ -414,7 +406,7 @@ RunService.RenderStepped:Connect(function()
             hum.WalkSpeed = getgenv().LunarState.Speed and getgenv().LunarState.Config.WalkSpeed or 16
             if getgenv().LunarState.JumpPower then
                 hum.UseJumpPower = true
-                hum.JumpPower = getgenv().LunarState.Config.JumpPower
+                hum.JumpPower = getgenv().LunarState.Config.JumpPowerVal
             end
         end
         
