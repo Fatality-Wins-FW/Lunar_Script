@@ -14,12 +14,16 @@ local function validateLuaContent(content, label)
         return false, "Received HTML page instead of Lua"
     end
     
-    if string.find(content, "404: Not Found") or string.find(content, "Not Found") then
+    if string.find(content, "404: Not Found") then
         return false, "File not found on repository"
     end
     
     local func, err = loadstring(content)
     if not func then
+        local lineNum = string.match(tostring(err), ":([%d]+):")
+        if lineNum then
+            return false, string.format("Syntax error at line %s: %s", lineNum, tostring(err))
+        end
         return false, string.format("Syntax error: %s", tostring(err))
     end
     
