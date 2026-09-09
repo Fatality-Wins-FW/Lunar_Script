@@ -4,7 +4,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
-local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
@@ -167,8 +166,18 @@ local function shoot()
     )
 end
 
+-- Load LinoriaLib and Addons
 local Library =
     loadstring(game:HttpGet("https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/Library.lua"))()
+local ThemeManager =
+    loadstring(
+    game:HttpGet("https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/addons/ThemeManager.lua")
+)()
+local SaveManager =
+    loadstring(
+    game:HttpGet("https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/addons/SaveManager.lua")
+)()
+
 Library:SetWatermarkVisibility(false)
 
 local Window = Library:CreateWindow({Title = "Lunar | Universal | V1", Center = true, AutoShow = true})
@@ -343,7 +352,7 @@ local function createEsp(player)
     local color = getgenv().LunarState.Config.Visuals.BoxColor
     local style = getgenv().LunarState.Config.Visuals.EspStyle
 
-    -- Fixed BillboardGui Positioning
+    -- Fixed BillboardGui Positioning using Offset
     obj.Box:ClearAllChildren()
     if getgenv().LunarState.ESP then
         obj.Box.Size = UDim2.new(0, width, 0, height)
@@ -680,9 +689,15 @@ MiscGroup:AddSlider(
         end}
 )
 
+MiscGroup:AddToggle(
+    "JumpPowerEnabled",
+    {Text = "Custom Jump Power", Callback = function(s)
+            getgenv().LunarState.JumpPower = s
+        end}
+)
 MiscGroup:AddSlider(
     "JumpPower",
-    {Text = "Jump Power", Min = 50, Max = 350, Default = 50, Rounding = 0, Callback = function(v)
+    {Text = "Jump Power Value", Min = 50, Max = 350, Default = 50, Rounding = 0, Callback = function(v)
             getgenv().LunarState.Config.JumpPowerVal = v
         end}
 )
@@ -729,7 +744,7 @@ ExtraGroup:AddToggle(
 )
 ExtraGroup:AddToggle(
     "AntiAim",
-    {Text = "Anti Aim", Callback = function(s)
+    {Text = "Anti Aim (Moveable)", Callback = function(s)
             getgenv().LunarState.AntiAim = s
         end}
 )
@@ -771,33 +786,14 @@ ExtraGroup:AddToggle(
 )
 
 print("[Lunar] Building Settings Section...")
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({"MenuKeybind"})
+ThemeManager:SetFolder("LunarUniversal")
+SaveManager:SetFolder("LunarUniversal")
+
 local ConfigGroup = SettingsTab:AddLeftGroupbox("Configuration")
-ConfigGroup:AddButton(
-    "Save Config",
-    function()
-        pcall(
-            function()
-                writefile("LunarUniversal_V2.json", HttpService:JSONEncode(getgenv().LunarState.Config))
-                Library:Notify("Saved!")
-            end
-        )
-    end
-)
-ConfigGroup:AddButton(
-    "Load Config",
-    function()
-        pcall(
-            function()
-                local d = readfile("LunarUniversal_V2.json")
-                local dec = HttpService:JSONDecode(d)
-                for k, v in pairs(dec) do
-                    getgenv().LunarState.Config[k] = v
-                end
-                Library:Notify("Loaded!")
-            end
-        )
-    end
-)
 ConfigGroup:AddButton(
     "Unload",
     function()
@@ -814,6 +810,9 @@ ConfigGroup:AddButton(
         Library:Unload()
     end
 )
+
+ThemeManager:ApplyToTab(SettingsTab)
+SaveManager:BuildConfigSection(SettingsTab)
 
 print("[Lunar] Starting Runtime Loops...")
 local frameSkip = 0
@@ -965,7 +964,7 @@ RunService.RenderStepped:Connect(
                 godConn = nil
             end
 
-            -- Anti Aim / Spin Bot
+            -- Anti Aim / Spin Bot (Allows Movement)
             if getgenv().LunarState.AntiAim or getgenv().LunarState.SpinBot then
                 if not aaConn then
                     aaConn =
@@ -973,6 +972,7 @@ RunService.RenderStepped:Connect(
                         function()
                             local hrp = Character:FindFirstChild("HumanoidRootPart")
                             if hrp then
+                                -- Apply rotation relative to current CFrame so WASD still works
                                 if getgenv().LunarState.SpinBot then
                                     hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(tick() * 500), 0)
                                 end
@@ -1131,4 +1131,4 @@ UserInputService.InputBegan:Connect(
     end
 )
 
-print("[Lunar] Universal Script initialized successfully!")
+print("[Lunar] Universal Script V1 initialized successfully!")
