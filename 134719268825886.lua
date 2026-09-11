@@ -2,35 +2,34 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
--- Debugging: Print startup info to console
 print("[Lunar] Initializing...")
 
 local LocalPlayer = Players.LocalPlayer
 local RemotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
 
 if not RemotesFolder then
-    error("[Lunar] CRITICAL ERROR: 'Remotes' folder not found in ReplicatedStorage. The game may have updated.")
+    error("[Lunar] CRITICAL ERROR: 'Remotes' folder not found in ReplicatedStorage.")
 end
 
 local remoteChildren = RemotesFolder:GetChildren()
-print(string.format("[Lunar] Found %d remotes in ReplicatedStorage", #remoteChildren))
+print(string.format("[Lunar] Found %d remotes", #remoteChildren))
 
--- Safe remote fetching with bounds checking
+-- Safe remote fetching
 local function GetRemote(index, name)
     if index > #remoteChildren then
-        warn(string.format("[Lunar] WARNING: Remote index %d for '%s' is out of bounds (Total: %d). Feature disabled.", index, name, #remoteChildren))
+        warn(string.format("[Lunar] Remote index %d (%s) out of bounds.", index, name))
         return nil
     end
     local remote = remoteChildren[index]
-    print(string.format("[Lunar] Loaded remote [%d]: %s (%s)", index, remote.Name, remote.ClassName))
+    print(string.format("[Lunar] Loaded [%d]: %s", index, remote.Name))
     return remote
 end
 
-local RebirthEvent = GetRemote(20, "RebirthEvent")
-local PetEvent = GetRemote(109, "PetEvent")
-local ClickEvent = GetRemote(154, "ClickEvent")
+local RebirthEvent = GetRemote(20, "Rebirth")
+local PetEvent = GetRemote(109, "Pet")
+local ClickEvent = GetRemote(154, "Click")
 
--- Load Library with error handling
+-- Load Library with strict error handling
 local Library, ThemeManager, SaveManager
 local success, err = pcall(function()
     Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
@@ -38,20 +37,11 @@ local success, err = pcall(function()
     SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
 end)
 
-if not success then
+if not success or not Library then
     error("[Lunar] Failed to load LinoriaLib: " .. tostring(err))
 end
 
 print("[Lunar] Library loaded successfully")
-
--- Check available methods for debugging
-print(string.format("[Lunar] Available Tab methods: AddToggle=%s, AddSlider=%s, AddDropdown=%s, AddComboBox=%s, AddListBox=%s",
-    type(Tabs.Main and Tabs.Main.AddToggle),
-    type(Tabs.Main and Tabs.Main.AddSlider),
-    type(Tabs.Main and Tabs.Main.AddDropdown),
-    type(Tabs.Main and Tabs.Main.AddComboBox),
-    type(Tabs.Main and Tabs.Main.AddListBox)
-))
 
 local GameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name or "Unknown Game"
 
@@ -61,11 +51,17 @@ local Window = Library:CreateWindow({
     AutoShow = true
 })
 
+-- Create tabs safely
 local Tabs = {
     Main = Window:AddTab("Main"),
     Teleport = Window:AddTab("Teleport"),
     Settings = Window:AddTab("Settings")
 }
+
+-- Verify tabs were created to prevent 'index nil' errors
+if not Tabs.Main or not Tabs.Teleport or not Tabs.Settings then
+    error("[Lunar] CRITICAL: Failed to create UI tabs. Library version incompatible.")
+end
 
 local LeftGroup = Tabs.Main:AddLeftGroupbox("Actions")
 local RightGroup = Tabs.Main:AddRightGroupbox("Automation")
@@ -73,86 +69,82 @@ local RightGroup = Tabs.Main:AddRightGroupbox("Automation")
 local Toggles = {}
 local Options = {}
 
+-- Main Features
 LeftGroup:AddToggle("AutoClick", {
     Text = "Auto Click Loop",
-    Default = false,
-    Tooltip = "Automatically fires the click event"
+    Default = false
 })
 
 RightGroup:AddToggle("AutoEquipBest", {
     Text = "Auto Equip Best Pet",
-    Default = false,
-    Tooltip = "Automatically equips the best pet"
+    Default = false
 })
 
 RightGroup:AddToggle("AutoRebirth", {
     Text = "Auto Rebirth",
-    Default = false,
-    Tooltip = "Automatically performs rebirths"
+    Default = false
 })
 
--- Using Slider instead of Dropdown for maximum compatibility
--- Islands: Spawn=1, Winter=2, Forest=3, Desert=4, Candy=5, Beach=6
-Options.IslandSelect = Tabs.Teleport:AddSlider("IslandSelect", {
-    Text = "Select Island",
-    Default = 1,
-    Min = 1,
-    Max = 6,
-    Rounding = 0,
-    Compact = false
-})
-
-local IslandNames = {
-    [1] = "Spawn",
-    [2] = "Winter Island",
-    [3] = "Forest Island",
-    [4] = "Desert Island",
-    [5] = "Candy Island",
-    [6] = "Beach Island"
+-- Teleport System using Toggles (Most compatible method)
+local IslandToggles = {}
+local Coordinates = {
+    ["Spawn"] = Vector3.new(-243.86, 164.48, 342.72),
+    ["Winter Island"] = Vector3.new(-202.88, 936.94, 326.96),
+    ["Forest Island"] = Vector3.new(-247.58, 2179.44, 249.47),
+    ["Desert Island"] = Vector3.new(-267.00, 3665.78, 362.30),
+    ["Candy Island"] = Vector3.new(-258.10, 5161.67, 299.96),
+    ["Beach Island"] = Vector3.new(-246.71, 6661.01, 342.58)
 }
 
+local IslandNames = {"Spawn", "Winter Island", "Forest Island", "Desert Island", "Candy Island", "Beach Island"}
+
+for _, name in ipairs(IslandNames) do
+    local toggleId = "Teleport" .. name:gsub("%s+", "")
+    IslandToggles[name] = Tabs.Teleport:AddToggle(toggleId, {
+        Text = "Select " .. name,
+        Default = false
+    })
+end
+
 Tabs.Teleport:AddButton({
-    Text = "Teleport to Island",
+    Text = "Teleport to Selected Island",
     Func = function()
-        local IslandIndex = math.floor(Options.IslandSelect.Value)
-        local SelectedIsland = IslandNames[IslandIndex]
+        local SelectedIsland = nil
+        
+        -- Find which toggle is active
+        for _, name in ipairs(IslandNames) do
+            if IslandToggles[name].Value then
+                SelectedIsland = name
+                break
+            end
+        end
         
         if not SelectedIsland then
-            Library:Notify("Invalid island selected!", 3)
+            Library:Notify("Please select an island first!", 3)
             return
         end
         
-        local Coordinates = {
-            ["Spawn"] = Vector3.new(-243.86, 164.48, 342.72),
-            ["Winter Island"] = Vector3.new(-202.88, 936.94, 326.96),
-            ["Forest Island"] = Vector3.new(-247.58, 2179.44, 249.47),
-            ["Desert Island"] = Vector3.new(-267.00, 3665.78, 362.30),
-            ["Candy Island"] = Vector3.new(-258.10, 5161.67, 299.96),
-            ["Beach Island"] = Vector3.new(-246.71, 6661.01, 342.58)
-        }
-        
         local TargetPos = Coordinates[SelectedIsland]
-        if TargetPos then
-            local Character = LocalPlayer.Character
-            if Character then
-                local RootPart = Character:FindFirstChild("HumanoidRootPart")
-                if RootPart then
-                    RootPart.CFrame = CFrame.new(TargetPos + Vector3.new(0, 5, 0))
-                    Library:Notify("Teleported to " .. SelectedIsland, 3)
-                else
-                    Library:Notify("Character not loaded yet!", 3)
-                end
+        local Character = LocalPlayer.Character
+        
+        if Character then
+            local RootPart = Character:FindFirstChild("HumanoidRootPart")
+            if RootPart then
+                RootPart.CFrame = CFrame.new(TargetPos + Vector3.new(0, 5, 0))
+                Library:Notify("Teleported to " .. SelectedIsland, 3)
             else
-                Library:Notify("No character found!", 3)
+                Library:Notify("Character root part missing!", 3)
             end
+        else
+            Library:Notify("Character not loaded!", 3)
         end
     end,
     DoubleClick = false
 })
 
+-- Managers Setup
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
-
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({})
 
@@ -161,33 +153,26 @@ SaveManager:BuildConfigSection(Tabs.Settings)
 
 Tabs.Settings:AddLeftGroupbox("Menu"):AddButton({
     Text = "Unload Script",
-    Func = function()
-        Library:Unload()
-    end,
+    Func = function() Library:Unload() end,
     DoubleClick = false
 })
 
 Library:Notify("Lunar V1 Loaded", 3)
 print("[Lunar] UI initialized successfully")
 
+-- Automation Loop with safety checks
 task.spawn(function()
     while task.wait() do
-        if Toggles.AutoClick.Value and ClickEvent then
-            pcall(function()
-                ClickEvent:FireServer()
-            end)
+        if Toggles.AutoClick and Toggles.AutoClick.Value and ClickEvent then
+            pcall(function() ClickEvent:FireServer() end)
         end
         
-        if Toggles.AutoEquipBest.Value and PetEvent then
-            pcall(function()
-                PetEvent:FireServer()
-            end)
+        if Toggles.AutoEquipBest and Toggles.AutoEquipBest.Value and PetEvent then
+            pcall(function() PetEvent:FireServer() end)
         end
         
-        if Toggles.AutoRebirth.Value and RebirthEvent then
-            pcall(function()
-                RebirthEvent:FireServer(3)
-            end)
+        if Toggles.AutoRebirth and Toggles.AutoRebirth.Value and RebirthEvent then
+            pcall(function() RebirthEvent:FireServer(3) end)
         end
     end
 end)
