@@ -60,7 +60,7 @@ local IslandList = {
     "Beach Island"
 }
 
-Options.IslandSelect = Tabs.Teleport:AddComboBox("IslandSelect", {
+Options.IslandSelect = Tabs.Teleport:AddDropdown("IslandSelect", {
     Values = IslandList,
     Multi = false,
     Default = 1,
