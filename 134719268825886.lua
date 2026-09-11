@@ -1,8 +1,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 
 print("[Lunar] Initializing...")
 
@@ -11,7 +9,7 @@ local LocalPlayer = Players.LocalPlayer
 local RemotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
 
 if not RemotesFolder then
-    error("[Lunar] CRITICAL: 'Remotes' folder missing.")
+    error("[Lunar] CRITICAL: 'Remotes' folder missing in ReplicatedStorage")
 end
 
 local remoteChildren = RemotesFolder:GetChildren()
@@ -19,61 +17,44 @@ print(string.format("[Lunar] Found %d remotes", #remoteChildren))
 
 local function GetRemote(index, name)
     if index > #remoteChildren then
-        warn(string.format("[Lunar] Remote %d (%s) out of bounds.", index, name))
+        warn(string.format("[Lunar] Remote %d (%s) out of bounds (Total: %d)", index, name, #remoteChildren))
         return nil
     end
-    print(string.format("[Lunar] Loaded [%d]: %s", index, remoteChildren[index].Name))
-    return remoteChildren[index]
+    local r = remoteChildren[index]
+    print(string.format("[Lunar] Loaded [%d]: %s (%s)", index, r.Name, r.ClassName))
+    return r
 end
 
 local RebirthEvent = GetRemote(20, "Rebirth")
 local PetEvent = GetRemote(109, "Pet")
 local ClickEvent = GetRemote(154, "Click")
 
--- [DEBUG] Library Load Attempt (We will bypass it if it fails)
-local LibraryLoaded = false
-pcall(function()
-    local Lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
-    -- If we get here without error, check if AddTab works
-    local TestWin = Lib:CreateWindow({Title="Test", AutoShow=false})
-    local TestTab = TestWin:AddTab("Test")
-    if TestTab then LibraryLoaded = true end
-    TestWin.Holder:Destroy() -- Clean up test window
-end)
-
-if not LibraryLoaded then
-    warn("[Lunar] LinoriaLib failed or incompatible. Switching to Native UI Mode.")
-else
-    print("[Lunar] LinoriaLib compatible.")
-end
-
--- ==========================================
--- NATIVE UI IMPLEMENTATION (Fallback)
--- ==========================================
+-- [STANDALONE UI] No external libraries needed
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "LunarUI"
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = game.CoreGui
 
--- Main Frame
+-- Main Window
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 300, 0, 400)
-MainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Size = UDim2.new(0, 320, 0, 450)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -225)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
 
 -- Title Bar
 local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 30)
-TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TitleBar.Size = UDim2.new(1, 0, 0, 35)
+TitleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 TitleBar.Parent = MainFrame
 
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Size = UDim2.new(1, -10, 1, 0)
 TitleLabel.Position = UDim2.new(0, 5, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "Lunar | Native Mode | V1"
+TitleLabel.Text = "Lunar | Standalone | V1"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.Font = Enum.Font.Code
 TitleLabel.TextSize = 16
@@ -81,38 +62,37 @@ TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.Parent = TitleBar
 
 -- Dragging Logic
-local dragging, dragInput, dragStart, startPos
+local dragging, dragStart, startPos
 TitleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
         dragStart = input.Position
         startPos = MainFrame.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
     end
 end)
 
-TitleBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragInput = input
+TitleBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
         local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        MainFrame.Position = UDim2.new(
+            startPos.X.Scale, 
+            startPos.X.Offset + delta.X, 
+            startPos.Y.Scale, 
+            startPos.Y.Offset + delta.Y
+        )
     end
 end)
 
 -- Content Area
 local Content = Instance.new("ScrollingFrame")
-Content.Size = UDim2.new(1, -10, 1, -40)
-Content.Position = UDim2.new(0, 5, 0, 35)
+Content.Size = UDim2.new(1, -10, 1, -45)
+Content.Position = UDim2.new(0, 5, 0, 40)
 Content.BackgroundTransparency = 1
 Content.ScrollBarThickness = 4
 Content.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -120,40 +100,42 @@ Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
 Content.Parent = MainFrame
 
 local ListLayout = Instance.new("UIListLayout")
-ListLayout.Padding = UDim.new(0, 5)
+ListLayout.Padding = UDim.new(0, 6)
 ListLayout.Parent = Content
 
--- Helper to create buttons/toggles
+-- UI Helpers
 local function CreateToggle(text, default, callback)
-    local ToggleFrame = Instance.new("Frame")
-    ToggleFrame.Size = UDim2.new(1, 0, 0, 25)
-    ToggleFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    ToggleFrame.Parent = Content
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, 0, 0, 28)
+    Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    Frame.BorderSizePixel = 0
+    Frame.Parent = Content
     
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -30, 1, 0)
-    Label.Position = UDim2.new(0, 5, 0, 0)
+    Label.Size = UDim2.new(1, -35, 1, 0)
+    Label.Position = UDim2.new(0, 8, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = text
     Label.TextColor3 = Color3.fromRGB(255, 255, 255)
     Label.Font = Enum.Font.Code
     Label.TextSize = 14
     Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Parent = ToggleFrame
+    Label.Parent = Frame
     
     local Box = Instance.new("Frame")
-    Box.Size = UDim2.new(0, 15, 0, 15)
-    Box.Position = UDim2.new(1, -20, 0.5, -7.5)
+    Box.Size = UDim2.new(0, 18, 0, 18)
+    Box.Position = UDim2.new(1, -25, 0.5, -9)
     Box.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    Box.Parent = ToggleFrame
+    Box.BorderSizePixel = 0
+    Box.Parent = Frame
     
     local state = default
     local function update()
-        Box.BackgroundColor3 = state and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(60, 60, 60)
-        callback(state)
+        Box.BackgroundColor3 = state and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(60, 60, 60)
+        if callback then callback(state) end
     end
     
-    ToggleFrame.InputBegan:Connect(function(i)
+    Frame.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then
             state = not state
             update()
@@ -166,30 +148,43 @@ end
 
 local function CreateButton(text, callback)
     local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(1, 0, 0, 25)
+    Btn.Size = UDim2.new(1, 0, 0, 28)
     Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Btn.BorderSizePixel = 0
     Btn.Text = text
     Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     Btn.Font = Enum.Font.Code
     Btn.TextSize = 14
     Btn.Parent = Content
     
+    Btn.MouseEnter:Connect(function() Btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60) end)
+    Btn.MouseLeave:Connect(function() Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50) end)
     Btn.MouseButton1Click:Connect(callback)
 end
 
+local function CreateLabel(text)
+    local Lbl = Instance.new("TextLabel")
+    Lbl.Size = UDim2.new(1, 0, 0, 20)
+    Lbl.BackgroundTransparency = 1
+    Lbl.Text = text
+    Lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+    Lbl.Font = Enum.Font.Code
+    Lbl.TextSize = 12
+    Lbl.TextXAlignment = Enum.TextXAlignment.Center
+    Lbl.Parent = Content
+end
+
 -- ==========================================
--- FEATURES
+-- BUILD INTERFACE
 -- ==========================================
 print("[Lunar] Building Interface...")
 
--- Toggles
-local AutoClick = CreateToggle("Auto Click Loop", false, function(v) print("[Lunar] AutoClick:", v) end)
-local AutoEquip = CreateToggle("Auto Equip Best", false, function(v) print("[Lunar] AutoEquip:", v) end)
-local AutoRebirth = CreateToggle("Auto Rebirth", false, function(v) print("[Lunar] AutoRebirth:", v) end)
+CreateLabel("=== AUTOMATION ===")
+local AutoClick = CreateToggle("Auto Click Loop", false)
+local AutoEquip = CreateToggle("Auto Equip Best Pet", false)
+local AutoRebirth = CreateToggle("Auto Rebirth", false)
 
--- Teleport System
-CreateButton("--- TELEPORTS ---", function() end)
-
+CreateLabel("=== TELEPORTS ===")
 local Islands = {
     {name="Spawn", pos=Vector3.new(-243.86, 164.48, 342.72)},
     {name="Winter Island", pos=Vector3.new(-202.88, 936.94, 326.96)},
@@ -206,11 +201,12 @@ for _, island in ipairs(Islands) do
             Char.HumanoidRootPart.CFrame = CFrame.new(island.pos + Vector3.new(0, 5, 0))
             print("[Lunar] Teleported to " .. island.name)
         else
-            warn("[Lunar] Character not found!")
+            warn("[Lunar] Character or RootPart missing!")
         end
     end)
 end
 
+CreateLabel("=== SYSTEM ===")
 CreateButton("Unload Script", function()
     ScreenGui:Destroy()
     print("[Lunar] Unloaded")
@@ -220,7 +216,7 @@ print("[Lunar] Interface Ready")
 
 -- Automation Loop
 task.spawn(function()
-    while task.wait() do
+    while task.wait(0.1) do
         if AutoClick.GetValue() and ClickEvent then
             pcall(function() ClickEvent:FireServer() end)
         end
