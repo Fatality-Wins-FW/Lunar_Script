@@ -5,13 +5,15 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
+-- Remote Events based on your original indexes
 local RebirthEvent = Remotes:GetChildren()[20]
 local PetEvent = Remotes:GetChildren()[109]
 local ClickEvent = Remotes:GetChildren()[154]
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/wally-rbix/LinoriaLib/main/Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/wally-rbix/LinoriaLib/main/addons/ThemeManager.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/wally-rbix/LinoriaLib/main/addons/SaveManager.lua"))()
+-- Load LinoriaLib and Addons from the official repository matching your Library.lua structure
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
 
 local GameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name or "Unknown Game"
 
@@ -33,6 +35,7 @@ local RightGroup = Tabs.Main:AddRightGroupbox("Automation")
 local Toggles = {}
 local Options = {}
 
+-- Main Features
 LeftGroup:AddToggle("AutoClick", {
     Text = "Auto Click Loop",
     Default = false,
@@ -51,6 +54,7 @@ RightGroup:AddToggle("AutoRebirth", {
     Tooltip = "Automatically performs rebirths"
 })
 
+-- Teleport Dropdown using AddDropdown as defined in your Library.lua
 local IslandList = {
     "Spawn",
     "Winter Island",
@@ -97,6 +101,7 @@ Tabs.Teleport:AddButton({
     DoubleClick = false
 })
 
+-- Setup Managers
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 
@@ -116,6 +121,7 @@ Tabs.Settings:AddLeftGroupbox("Menu"):AddButton({
 
 Library:Notify("Lunar V1 Loaded", 3)
 
+-- Automation Loop
 task.spawn(function()
     while task.wait() do
         if Toggles.AutoClick.Value then
