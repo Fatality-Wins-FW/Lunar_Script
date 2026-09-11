@@ -2,18 +2,56 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+-- Debugging: Print startup info to console
+print("[Lunar] Initializing...")
+
 local LocalPlayer = Players.LocalPlayer
-local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local RemotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
 
--- Remote Events based on your original indexes
-local RebirthEvent = Remotes:GetChildren()[20]
-local PetEvent = Remotes:GetChildren()[109]
-local ClickEvent = Remotes:GetChildren()[154]
+if not RemotesFolder then
+    error("[Lunar] CRITICAL ERROR: 'Remotes' folder not found in ReplicatedStorage. The game may have updated.")
+end
 
--- Load LinoriaLib and Addons from the official repository matching your Library.lua structure
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
+local remoteChildren = RemotesFolder:GetChildren()
+print(string.format("[Lunar] Found %d remotes in ReplicatedStorage", #remoteChildren))
+
+-- Safe remote fetching with bounds checking
+local function GetRemote(index, name)
+    if index > #remoteChildren then
+        warn(string.format("[Lunar] WARNING: Remote index %d for '%s' is out of bounds (Total: %d). Feature disabled.", index, name, #remoteChildren))
+        return nil
+    end
+    local remote = remoteChildren[index]
+    print(string.format("[Lunar] Loaded remote [%d]: %s (%s)", index, remote.Name, remote.ClassName))
+    return remote
+end
+
+local RebirthEvent = GetRemote(20, "RebirthEvent")
+local PetEvent = GetRemote(109, "PetEvent")
+local ClickEvent = GetRemote(154, "ClickEvent")
+
+-- Load Library with error handling
+local Library, ThemeManager, SaveManager
+local success, err = pcall(function()
+    Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
+    ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
+    SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
+end)
+
+if not success then
+    error("[Lunar] Failed to load LinoriaLib: " .. tostring(err))
+end
+
+print("[Lunar] Library loaded successfully")
+
+-- Check available methods for debugging
+print(string.format("[Lunar] Available Tab methods: AddToggle=%s, AddSlider=%s, AddDropdown=%s, AddComboBox=%s, AddListBox=%s",
+    type(Tabs.Main and Tabs.Main.AddToggle),
+    type(Tabs.Main and Tabs.Main.AddSlider),
+    type(Tabs.Main and Tabs.Main.AddDropdown),
+    type(Tabs.Main and Tabs.Main.AddComboBox),
+    type(Tabs.Main and Tabs.Main.AddListBox)
+))
 
 local GameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name or "Unknown Game"
 
@@ -35,7 +73,6 @@ local RightGroup = Tabs.Main:AddRightGroupbox("Automation")
 local Toggles = {}
 local Options = {}
 
--- Main Features
 LeftGroup:AddToggle("AutoClick", {
     Text = "Auto Click Loop",
     Default = false,
@@ -54,28 +91,36 @@ RightGroup:AddToggle("AutoRebirth", {
     Tooltip = "Automatically performs rebirths"
 })
 
--- Teleport Dropdown using AddDropdown as defined in your Library.lua
-local IslandList = {
-    "Spawn",
-    "Winter Island",
-    "Forest Island",
-    "Desert Island",
-    "Candy Island",
-    "Beach Island"
-}
-
-Options.IslandSelect = Tabs.Teleport:AddDropdown("IslandSelect", {
-    Values = IslandList,
-    Multi = false,
+-- Using Slider instead of Dropdown for maximum compatibility
+-- Islands: Spawn=1, Winter=2, Forest=3, Desert=4, Candy=5, Beach=6
+Options.IslandSelect = Tabs.Teleport:AddSlider("IslandSelect", {
+    Text = "Select Island",
     Default = 1,
-    Text = "Select Island"
+    Min = 1,
+    Max = 6,
+    Rounding = 0,
+    Compact = false
 })
+
+local IslandNames = {
+    [1] = "Spawn",
+    [2] = "Winter Island",
+    [3] = "Forest Island",
+    [4] = "Desert Island",
+    [5] = "Candy Island",
+    [6] = "Beach Island"
+}
 
 Tabs.Teleport:AddButton({
     Text = "Teleport to Island",
     Func = function()
-        local SelectedIsland = Options.IslandSelect.Value
-        if not SelectedIsland then return end
+        local IslandIndex = math.floor(Options.IslandSelect.Value)
+        local SelectedIsland = IslandNames[IslandIndex]
+        
+        if not SelectedIsland then
+            Library:Notify("Invalid island selected!", 3)
+            return
+        end
         
         local Coordinates = {
             ["Spawn"] = Vector3.new(-243.86, 164.48, 342.72),
@@ -94,14 +139,17 @@ Tabs.Teleport:AddButton({
                 if RootPart then
                     RootPart.CFrame = CFrame.new(TargetPos + Vector3.new(0, 5, 0))
                     Library:Notify("Teleported to " .. SelectedIsland, 3)
+                else
+                    Library:Notify("Character not loaded yet!", 3)
                 end
+            else
+                Library:Notify("No character found!", 3)
             end
         end
     end,
     DoubleClick = false
 })
 
--- Setup Managers
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 
@@ -120,23 +168,23 @@ Tabs.Settings:AddLeftGroupbox("Menu"):AddButton({
 })
 
 Library:Notify("Lunar V1 Loaded", 3)
+print("[Lunar] UI initialized successfully")
 
--- Automation Loop
 task.spawn(function()
     while task.wait() do
-        if Toggles.AutoClick.Value then
+        if Toggles.AutoClick.Value and ClickEvent then
             pcall(function()
                 ClickEvent:FireServer()
             end)
         end
         
-        if Toggles.AutoEquipBest.Value then
+        if Toggles.AutoEquipBest.Value and PetEvent then
             pcall(function()
                 PetEvent:FireServer()
             end)
         end
         
-        if Toggles.AutoRebirth.Value then
+        if Toggles.AutoRebirth.Value and RebirthEvent then
             pcall(function()
                 RebirthEvent:FireServer(3)
             end)
@@ -145,7 +193,7 @@ task.spawn(function()
 end)
 
 Library:OnUnload(function()
-    print("Lunar Unloaded")
+    print("[Lunar] Unloaded")
 end)
 
 SaveManager:LoadAutoloadConfig()
