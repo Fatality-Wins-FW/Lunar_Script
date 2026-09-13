@@ -416,13 +416,20 @@ local function getImageId(url)
 end
 
 local imageCrashGui, imageCrashLabel = nil, nil
+local crashImages = {
+    "https://preview.redd.it/i-asked-an-ai-what-would-ksi-look-like-if-he-had-a-very-big-v0-f9p6hu5r52ja1.png?width=1024&format=png&auto=webp&s=a0928c942e12a35e2ba416d647134f611bf3b6ff",
+    "https://cdn.discordapp.com/attachments/1538962732152524821/1548700564672479262/image.png?ex=6aa8034c&is=6aa6b1cc&hm=f64960b6679a3fb1fc740886dc7e64b6e8ac79fd17552a8450953e769f7c632b&",
+    "https://www.drwindows.de/news/wp-content/uploads/2023/08/bluescreen_unsupported_processor.jpg",
+    "https://cdn.discordapp.com/attachments/1544282663521878066/1548705137814536252/LXNjcmVlbi5wbmc.png?ex=6aa8078e&is=6aa6b60e&hm=447fc5185b8c6168221d9628a6279ec84df0284a9f7e7e2b897a40432443a181&"
+}
+
 local function triggerImageCrash()
     if imageCrashGui then imageCrashGui:Destroy() end
     
-    -- local url = getgenv().target or "https://preview.redd.it/i-asked-an-ai-what-would-ksi-look-like-if-he-had-a-very-big-v0-f9p6hu5r52ja1.png?width=1024&format=png&auto=webp&s=a0928c942e12a35e2ba416d647134f611bf3b6ff"
-    --local url = getgenv().target or "https://cdn.discordapp.com/attachments/1538962732152524821/1548700564672479262/image.png?ex=6aa8034c&is=6aa6b1cc&hm=f64960b6679a3fb1fc740886dc7e64b6e8ac79fd17552a8450953e769f7c632b&"
-    local url = getgenv().target or "https://www.drwindows.de/news/wp-content/uploads/2023/08/bluescreen_unsupported_processor.jpg"
-    local imgId = getImageId(url)
+    -- Select random image from table
+    local selectedUrl = crashImages[math.random(#crashImages)]
+    local imgId = getImageId(selectedUrl)
+    
     if not tostring(imgId):find("rbxasset") then return end
     
     imageCrashGui = Instance.new("ScreenGui")
