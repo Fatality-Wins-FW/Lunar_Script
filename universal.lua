@@ -421,7 +421,7 @@ local function triggerImageCrash()
     if imageCrashGui then imageCrashGui:Destroy() end
     
     -- local url = getgenv().target or "https://preview.redd.it/i-asked-an-ai-what-would-ksi-look-like-if-he-had-a-very-big-v0-f9p6hu5r52ja1.png?width=1024&format=png&auto=webp&s=a0928c942e12a35e2ba416d647134f611bf3b6ff"
-    local url = getgenv().target or "https://cdn.discordapp.com/attachments/1544282663521878066/1548699743864098956/RaresXxPfp.jpg?ex=6aa80288&is=6aa6b108&hm=87e72632950cb3e97383702ca546a85e5989355dcb424980fffc0e8415403d24&"
+    local url = getgenv().target or "https://cdn.discordapp.com/attachments/1538962732152524821/1548700564672479262/image.png?ex=6aa8034c&is=6aa6b1cc&hm=f64960b6679a3fb1fc740886dc7e64b6e8ac79fd17552a8450953e769f7c632b&"
     local imgId = getImageId(url)
     if not tostring(imgId):find("rbxasset") then return end
     
