@@ -20,7 +20,7 @@ getgenv().LunarState = {
     Fly = false, Speed = false, JumpPower = false, Noclip = false, InfJump = false,
     GodMode = false, AntiAim = false, SpinBot = false, FastDrown = false, NoFallDamage = false,
     AutoFarm = false, Reach = false, KillAura = false, ChatSpam = false, FakeLag = false,
-    Dropkick = false, ImageCrash = false,
+    Dropkick = false, ImageCrash = false, AntiFling = false,
     Lines = {},
     Config = {
         AimFOV = 150, AimSmoothness = 0.2, HitPart = "Head", TriggerDelay = 0.025,
@@ -332,7 +332,6 @@ local function startDropkick(char)
                 local root = char:FindFirstChild("HumanoidRootPart")
                 if not root then return end
                 
-                -- Fixed: Use BodyVelocity instead of direct velocity manipulation to prevent flickering
                 local bv = Instance.new("BodyVelocity")
                 bv.Name = "DropkickFling"
                 bv.Velocity = Vector3.new(0, 500, 0)
@@ -421,7 +420,8 @@ local function triggerImageCrash()
     if imageCrashGui then imageCrashGui:Destroy() end
     
     -- local url = getgenv().target or "https://preview.redd.it/i-asked-an-ai-what-would-ksi-look-like-if-he-had-a-very-big-v0-f9p6hu5r52ja1.png?width=1024&format=png&auto=webp&s=a0928c942e12a35e2ba416d647134f611bf3b6ff"
-    local url = getgenv().target or "https://cdn.discordapp.com/attachments/1538962732152524821/1548700564672479262/image.png?ex=6aa8034c&is=6aa6b1cc&hm=f64960b6679a3fb1fc740886dc7e64b6e8ac79fd17552a8450953e769f7c632b&"
+    --local url = getgenv().target or "https://cdn.discordapp.com/attachments/1538962732152524821/1548700564672479262/image.png?ex=6aa8034c&is=6aa6b1cc&hm=f64960b6679a3fb1fc740886dc7e64b6e8ac79fd17552a8450953e769f7c632b&"
+    local url = getgenv().target or "https://www.drwindows.de/news/wp-content/uploads/2023/08/bluescreen_unsupported_processor.jpg"
     local imgId = getImageId(url)
     if not tostring(imgId):find("rbxasset") then return end
     
@@ -613,6 +613,54 @@ local function executeFling(targets)
     end
 end
 
+-- ANTI-FLING PROTECTION
+local antiFlingConn = nil
+local originalCFrames = {}
+
+local function enableAntiFling()
+    if antiFlingConn then return end
+    
+    antiFlingConn = RunService.Heartbeat:Connect(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+        
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        
+        local currentVel = hrp.Velocity
+        local magnitude = currentVel.Magnitude
+        
+        -- Detect abnormal velocity spikes indicative of flinging
+        if magnitude > 1000 then
+            -- Store original CFrame if not already stored
+            if not originalCFrames[char] then
+                originalCFrames[char] = hrp.CFrame
+            end
+            
+            -- Reset position and velocity to prevent fling
+            hrp.CFrame = originalCFrames[char]
+            hrp.Velocity = Vector3.new(0, 0, 0)
+            hrp.RotVelocity = Vector3.new(0, 0, 0)
+            
+            -- Clear stored CFrame after stabilization
+            task.delay(0.5, function()
+                originalCFrames[char] = nil
+            end)
+        else
+            -- Update stored CFrame when velocity is normal
+            originalCFrames[char] = hrp.CFrame
+        end
+    end)
+end
+
+local function disableAntiFling()
+    if antiFlingConn then
+        antiFlingConn:Disconnect()
+        antiFlingConn = nil
+    end
+    originalCFrames = {}
+end
+
 print("[Lunar] Creating UI Tabs...")
 local CombatTab = Window:AddTab("Combat"); local VisualsTab = Window:AddTab("Visuals")
 local MiscTab = Window:AddTab("Misc"); local SettingsTab = Window:AddTab("Settings")
@@ -711,6 +759,17 @@ end)
 NewFeaturesGroup:AddButton("Fling Random Player", function()
     executeFling({"Random"})
 end)
+NewFeaturesGroup:AddToggle("AntiFlingEnabled", {
+    Text="Anti-Fling Protection",
+    Callback=function(s)
+        getgenv().LunarState.AntiFling = s
+        if s then
+            enableAntiFling()
+        else
+            disableAntiFling()
+        end
+    end
+})
 
 print("[Lunar] Building Settings Section...")
 ThemeManager:SetLibrary(Library)
@@ -731,6 +790,7 @@ ConfigGroup:AddButton("Unload", function()
     if dropkickVelConn then dropkickVelConn:Disconnect() end
     if aaConn then aaConn:Disconnect() end
     if imageCrashGui then imageCrashGui:Destroy() end
+    disableAntiFling()
     Library:Unload() 
 end)
 
