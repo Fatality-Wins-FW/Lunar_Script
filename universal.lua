@@ -4,7 +4,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
-local AnimationClipProvider = game:GetService("AnimationClipProvider")
 local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -21,7 +20,7 @@ getgenv().LunarState = {
     Fly = false, Speed = false, JumpPower = false, Noclip = false, InfJump = false,
     GodMode = false, AntiAim = false, SpinBot = false, FastDrown = false, NoFallDamage = false,
     AutoFarm = false, Reach = false, KillAura = false, ChatSpam = false, FakeLag = false,
-    Dropkick = false, ImageCrash = false, FlingAll = false,
+    Dropkick = false, ImageCrash = false,
     Lines = {},
     Config = {
         AimFOV = 150, AimSmoothness = 0.2, HitPart = "Head", TriggerDelay = 0.025,
@@ -34,7 +33,7 @@ getgenv().LunarState = {
         },
         Keys = {
             Aimbot = Enum.KeyCode.None, Trigger = Enum.KeyCode.None, Fly = Enum.KeyCode.None,
-            Noclip = Enum.KeyCode.None, Speed = Enum.KeyCode.None
+            Noclip = Enum.KeyCode.None, Speed = Enum.KeyCode.None, AntiAim = Enum.KeyCode.None
         }
     }
 }
@@ -67,7 +66,7 @@ local function isFeatureActive(featureName)
     local state = getgenv().LunarState[featureName]
     local key = getgenv().LunarState.Config.Keys[featureName]
     if not state then return false end
-    if key ~= Enum.KeyCode.None then
+    if key and key ~= Enum.KeyCode.None then
         return UserInputService:IsKeyDown(key)
     end
     return true
@@ -311,9 +310,10 @@ local function createEsp(player)
     end
 end
 
+-- DROPKICK FLING LOGIC (Fixed Flickering)
 local dropkickAnim = Instance.new("Animation")
 dropkickAnim.AnimationId = "rbxassetid://133566007754001"
-local dropkickTrack, dropkickConn, dropkickNoclipConn = nil, nil, nil
+local dropkickTrack, dropkickConn, dropkickNoclipConn, dropkickVelConn = nil, nil, nil, nil
 
 local function startDropkick(char)
     if not char then return end
@@ -329,23 +329,27 @@ local function startDropkick(char)
             if not getgenv().LunarState.Dropkick or not dropkickTrack then return end
             pcall(function()
                 dropkickTrack:Play()
-                local root = char:FindFirstChild("LeftLowerLeg")
+                local root = char:FindFirstChild("HumanoidRootPart")
                 if not root then return end
                 
-                local oldVel = root.Velocity
-                repeat 
-                    RunService.Heartbeat:Wait()
-                    hum.HipHeight = 2.5008
-                    local vel = root.Velocity
-                    root.Velocity = vel * 1e6 + Vector3.new(0, 1e6, 0)
-                    RunService.RenderStepped:Wait()
-                    root.Velocity = vel
-                    RunService.Stepped:Wait()
-                    root.Velocity = vel + Vector3.new(0, 0.1, 0)
-                until not dropkickTrack.IsPlaying
+                -- Fixed: Use BodyVelocity instead of direct velocity manipulation to prevent flickering
+                local bv = Instance.new("BodyVelocity")
+                bv.Name = "DropkickFling"
+                bv.Velocity = Vector3.new(0, 500, 0)
+                bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+                bv.Parent = root
                 
-                hum.HipHeight = 2.0008
-                root.Velocity = oldVel
+                dropkickVelConn = RunService.Heartbeat:Connect(function()
+                    if not getgenv().LunarState.Dropkick or not char or not root then 
+                        if bv then bv:Destroy() end
+                        return 
+                    end
+                    bv.Velocity = Vector3.new(0, 500 + math.random(-50, 50), 0)
+                end)
+                
+                dropkickTrack.Stopped:Wait()
+                if bv then bv:Destroy() end
+                if dropkickVelConn then dropkickVelConn:Disconnect(); dropkickVelConn = nil end
             end)
         end)
         
@@ -361,6 +365,7 @@ end
 if LocalPlayer.Character then startDropkick(LocalPlayer.Character) end
 LocalPlayer.CharacterAdded:Connect(startDropkick)
 
+-- CUSTOMIZABLE ANTI-AIM LOGIC
 local aaConn, aaBindConn = nil, nil
 local function updateAntiAim()
     if aaConn then aaConn:Disconnect(); aaConn = nil end
@@ -395,6 +400,7 @@ local function updateAntiAim()
     end)
 end
 
+-- IMAGE CRASHER LOGIC
 local function getImageId(url)
     local success, response = pcall(function()
         return request({ Url = url, Method = "GET" })
@@ -414,7 +420,8 @@ local imageCrashGui, imageCrashLabel = nil, nil
 local function triggerImageCrash()
     if imageCrashGui then imageCrashGui:Destroy() end
     
-    local url = getgenv().target or "https://preview.redd.it/i-asked-an-ai-what-would-ksi-look-like-if-he-had-a-very-big-v0-f9p6hu5r52ja1.png?width=1024&format=png&auto=webp&s=a0928c942e12a35e2ba416d647134f611bf3b6ff"
+    -- local url = getgenv().target or "https://preview.redd.it/i-asked-an-ai-what-would-ksi-look-like-if-he-had-a-very-big-v0-f9p6hu5r52ja1.png?width=1024&format=png&auto=webp&s=a0928c942e12a35e2ba416d647134f611bf3b6ff"
+    local url = getgenv().target or "https://cdn.discordapp.com/attachments/1544282663521878066/1548699743864098956/RaresXxPfp.jpg?ex=6aa80288&is=6aa6b108&hm=87e72632950cb3e97383702ca546a85e5989355dcb424980fffc0e8415403d24&"
     local imgId = getImageId(url)
     if not tostring(imgId):find("rbxasset") then return end
     
@@ -444,6 +451,7 @@ local function triggerImageCrash()
     end)
 end
 
+-- FLING SYSTEM
 local AllBool = false
 local function GetMessage(_Title, _Text, Time)
     pcall(function() StarterGui:SetCore("SendNotification", {Title = _Title, Text = _Text, Duration = Time}) end)
@@ -469,88 +477,107 @@ local function GetPlayer(Name)
 end
 
 local function FlingTarget(TargetPlayer)
+    if not TargetPlayer or not TargetPlayer.Character then
+        return GetMessage("Error", "Target has no character", 3)
+    end
+    
     local Character = LocalPlayer.Character
     local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
     local RootPart = Humanoid and Humanoid.RootPart
 
     local TCharacter = TargetPlayer.Character
+    if not TCharacter then return end
+    
     local THumanoid = TCharacter:FindFirstChildOfClass("Humanoid")
-    local TRootPart = THumanoid and THumanoid.RootPart
+    if not THumanoid then return end
+    
+    local TRootPart = THumanoid.RootPart
     local THead = TCharacter:FindFirstChild("Head")
     local Accessory = TCharacter:FindFirstChildOfClass("Accessory")
     local Handle = Accessory and Accessory:FindFirstChild("Handle")
 
-    if Character and Humanoid and RootPart then
-        if RootPart.Velocity.Magnitude < 50 then getgenv().OldPos = RootPart.CFrame end
-        if THumanoid and THumanoid.Sit and not AllBool then
-            return GetMessage("Error Occurred", "Target is sitting", 5)
-        end
-        
-        if THead then Camera.CameraSubject = THead
-        elseif Handle then Camera.CameraSubject = Handle
-        elseif THumanoid then Camera.CameraSubject = THumanoid end
-        
-        if not TCharacter:FindFirstChildWhichIsA("BasePart") then return end
-        
-        local FPos = function(BasePart, Pos, Ang)
-            RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
-            Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
-            RootPart.Velocity = Vector3.new(9e7, 9e8, 9e7)
-            RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
-        end
-        
-        local SFBasePart = function(BasePart)
-            local TimeToWait = 2
-            local Time = tick()
-            local Angle = 0
+    if not (Character and Humanoid and RootPart) then
+        return GetMessage("Error", "Local player missing components", 3)
+    end
 
-            repeat
-                if RootPart and THumanoid then
-                    if BasePart.Velocity.Magnitude < 50 then
-                        Angle = Angle + 100
-                        FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0)); task.wait()
-                        FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(2.25, 1.5, -2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(-2.25, -1.5, 2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection,CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection,CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
-                    else
-                        FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0, 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(0, -1.5, -TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(0, 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(0, -1.5 ,0), CFrame.Angles(math.rad(-90), 0, 0)); task.wait()
-                        FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0)); task.wait()
-                    end
-                else break end
-            until BasePart.Velocity.Magnitude > 500 or BasePart.Parent ~= TargetPlayer.Character or TargetPlayer.Parent ~= Players or not TargetPlayer.Character == TCharacter or (THumanoid and THumanoid.Sit) or Humanoid.Health <= 0 or tick() > Time + TimeToWait
-        end
-        
-        workspace.FallenPartsDestroyHeight = 0/0
-        
-        local BV = Instance.new("BodyVelocity")
-        BV.Name = "EpixVel"; BV.Parent = RootPart
-        BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
-        BV.MaxForce = Vector3.new(1/0, 1/0, 1/0)
-        
-        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-        
-        if TRootPart and THead then
-            if (TRootPart.CFrame.p - THead.CFrame.p).Magnitude > 5 then SFBasePart(THead) else SFBasePart(TRootPart) end
-        elseif TRootPart then SFBasePart(TRootPart)
-        elseif THead then SFBasePart(THead)
-        elseif Handle then SFBasePart(Handle)
-        else return GetMessage("Error Occurred", "Target is missing everything", 5) end
-        
+    if RootPart.Velocity.Magnitude < 50 then getgenv().OldPos = RootPart.CFrame end
+    if THumanoid.Sit and not AllBool then
+        return GetMessage("Error Occurred", "Target is sitting", 5)
+    end
+    
+    if THead then Camera.CameraSubject = THead
+    elseif Handle then Camera.CameraSubject = Handle
+    elseif THumanoid then Camera.CameraSubject = THumanoid end
+    
+    if not TCharacter:FindFirstChildWhichIsA("BasePart") then return end
+    
+    local FPos = function(BasePart, Pos, Ang)
+        if not RootPart or not Character then return end
+        RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
+        Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
+        RootPart.Velocity = Vector3.new(9e7, 9e8, 9e7)
+        RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+    end
+    
+    local SFBasePart = function(BasePart)
+        if not BasePart or not THumanoid or not RootPart then return end
+        local TimeToWait = 2
+        local Time = tick()
+        local Angle = 0
+
+        repeat
+            if RootPart and THumanoid and BasePart.Parent == TCharacter then
+                if BasePart.Velocity.Magnitude < 50 then
+                    Angle = Angle + 100
+                    FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(2.25, 1.5, -2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(-2.25, -1.5, 2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection,CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection,CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
+                else
+                    FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0, 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, 1.5, TRootPart and TRootPart.Velocity.Magnitude / 1.25 or 0), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, -(TRootPart and TRootPart.Velocity.Magnitude / 1.25 or 0)), CFrame.Angles(0, 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, 1.5, TRootPart and TRootPart.Velocity.Magnitude / 1.25 or 0), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5 ,0), CFrame.Angles(math.rad(-90), 0, 0)); task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0)); task.wait()
+                end
+            else break end
+        until not BasePart or not BasePart.Parent or BasePart.Parent ~= TCharacter or TargetPlayer.Parent ~= Players or not TargetPlayer.Character or TargetPlayer.Character ~= TCharacter or (THumanoid and THumanoid.Sit) or (Humanoid and Humanoid.Health <= 0) or tick() > Time + TimeToWait
+    end
+    
+    workspace.FallenPartsDestroyHeight = 0/0
+    
+    local BV = Instance.new("BodyVelocity")
+    BV.Name = "EpixVel"; BV.Parent = RootPart
+    BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
+    BV.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+    
+    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+    
+    if TRootPart and THead then
+        if (TRootPart.CFrame.p - THead.CFrame.p).Magnitude > 5 then SFBasePart(THead) else SFBasePart(TRootPart) end
+    elseif TRootPart then SFBasePart(TRootPart)
+    elseif THead then SFBasePart(THead)
+    elseif Handle then SFBasePart(Handle)
+    else 
         BV:Destroy()
         Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-        Camera.CameraSubject = Humanoid
-        
+        return GetMessage("Error Occurred", "Target is missing everything", 5) 
+    end
+    
+    BV:Destroy()
+    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+    Camera.CameraSubject = Humanoid
+    
+    if getgenv().OldPos then
         repeat
+            if not RootPart or not Character then break end
             RootPart.CFrame = getgenv().OldPos * CFrame.new(0, .5, 0)
             Character:SetPrimaryPartCFrame(getgenv().OldPos * CFrame.new(0, .5, 0))
             Humanoid:ChangeState("GettingUp")
@@ -558,11 +585,9 @@ local function FlingTarget(TargetPlayer)
                 if x:IsA("BasePart") then x.Velocity, x.RotVelocity = Vector3.new(), Vector3.new() end
             end
             task.wait()
-        until (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
-        workspace.FallenPartsDestroyHeight = getgenv().FPDH or -500
-    else
-        return GetMessage("Error Occurred", "Random error", 5)
+        until not RootPart or not getgenv().OldPos or (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
     end
+    workspace.FallenPartsDestroyHeight = getgenv().FPDH or -500
 end
 
 local function executeFling(targets)
@@ -649,6 +674,7 @@ local aaToggle = ExtraGroup:AddToggle("AntiAimEnabled", {
         updateAntiAim()
     end 
 })
+aaToggle:AddKeyPicker("AntiAimKey", { Default="None", SyncToggleState=false, Mode="Hold", Text="Anti Aim Key", NoUI=true, ChangedCallback=function(new) getgenv().LunarState.Config.Keys.AntiAim=new end })
 ExtraGroup:AddSlider("AntiAimX", { Text="X Radius", Min=1, Max=100, Default=5, Rounding=0, Callback=function(v) getgenv().LunarState.Config.AntiAimX=v end })
 ExtraGroup:AddSlider("AntiAimY", { Text="Y Radius", Min=1, Max=100, Default=5, Rounding=0, Callback=function(v) getgenv().LunarState.Config.AntiAimY=v end })
 ExtraGroup:AddSlider("AntiAimZ", { Text="Z Radius", Min=1, Max=100, Default=5, Rounding=0, Callback=function(v) getgenv().LunarState.Config.AntiAimZ=v end })
@@ -668,6 +694,7 @@ NewFeaturesGroup:AddToggle("DropkickEnabled", {
         if not s then
             if dropkickConn then dropkickConn:Disconnect(); dropkickConn = nil end
             if dropkickNoclipConn then dropkickNoclipConn:Disconnect(); dropkickNoclipConn = nil end
+            if dropkickVelConn then dropkickVelConn:Disconnect(); dropkickVelConn = nil end
             if dropkickTrack then dropkickTrack:Stop() end
         end
     end 
@@ -701,6 +728,7 @@ ConfigGroup:AddButton("Unload", function()
     if MyUI then MyUI:Destroy() end
     if dropkickConn then dropkickConn:Disconnect() end
     if dropkickNoclipConn then dropkickNoclipConn:Disconnect() end
+    if dropkickVelConn then dropkickVelConn:Disconnect() end
     if aaConn then aaConn:Disconnect() end
     if imageCrashGui then imageCrashGui:Destroy() end
     Library:Unload() 
