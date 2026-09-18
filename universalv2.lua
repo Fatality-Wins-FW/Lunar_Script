@@ -39,6 +39,8 @@ UI:AddKeybind(settingsSec, {Name = "Menu Keybind", Default = Enum.KeyCode.RightS
 UI:AddTextbox(settingsSec, {Name = "Username", Placeholder = "Enter username...", Flag = "username"})
 
 SaveManager:BuildConfigSection(settingsSec)
+
+-- ADDED UNLOAD BUTTON HERE
 UI:AddButton(settingsSec, {Name = "Unload Script", Callback = function() UI:Unload() end})
 
 SaveManager:LoadAutoloadConfig()

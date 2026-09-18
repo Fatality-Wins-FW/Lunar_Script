@@ -89,7 +89,6 @@ function Library:Notify(title, message, duration)
     end)
 end
 
--- FIXED ADDTAB FUNCTION: No :Fire() used anywhere
 function Library:AddTab(name)
     local btn = Create("TextButton", {Size = UDim2.new(1, -12, 0, 36), Position = UDim2.new(0, 6, 0, (#self.Tabs * 40) + 6), BackgroundColor3 = Color3.fromRGB(30, 28, 28), BorderSizePixel = 0, Text = name, TextColor3 = Color3.fromRGB(150, 150, 150), TextSize = 13, Font = Enum.Font.GothamMedium, AutoButtonColor = false, Parent = self.TabContainer})
     Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
@@ -98,7 +97,6 @@ function Library:AddTab(name)
     
     local data = {Btn = btn, Cont = content, Y = 0}
     
-    -- Define selection logic as a standalone function
     local function selectThisTab()
         if self.CurrentTab then
             self.CurrentTab.Btn.BackgroundColor3 = Color3.fromRGB(30, 28, 28)
@@ -111,11 +109,9 @@ function Library:AddTab(name)
         content.Visible = true
     end
 
-    -- Connect the click event to the function
     btn.MouseButton1Click:Connect(selectThisTab)
     table.insert(self.Tabs, data)
     
-    -- Directly call the function for the first tab instead of firing a signal
     if #self.Tabs == 1 then 
         selectThisTab() 
     end
@@ -123,12 +119,16 @@ function Library:AddTab(name)
     return data
 end
 
+-- FIXED: Uses task.defer to prevent nil errors during initial render
 function Library:_UpdateCanvas(frame)
-    local h = 0
-    for _, c in ipairs(frame:GetChildren()) do
-        if c:IsA("GuiObject") and c.Visible then h = h + c.AbsoluteSize.Y + 6 end
-    end
-    frame.CanvasSize = UDim2.new(0, 0, 0, h)
+    task.defer(function()
+        if not frame or not frame:GetChildren() then return end
+        local h = 0
+        for _, c in ipairs(frame:GetChildren()) do
+            if c:IsA("GuiObject") and c.Visible then h = h + c.AbsoluteSize.Y + 6 end
+        end
+        frame.CanvasSize = UDim2.new(0, 0, 0, h)
+    end)
 end
 
 function Library:AddSection(tab, name)
@@ -277,15 +277,42 @@ end
 
 table.insert(Library.UnloadFunctions, function() if Library.ScreenGui then Library.ScreenGui:Destroy() end end)
 
+-- FIXED DRAG & RESIZE LOGIC
 function Library:_SetupDragResize()
     local dragging, dragOffset, resizing, resizeStartSize, resizeStartPos = false, Vector2.new(), false, Vector2.new(), Vector2.new()
-    self.DragHandle.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; dragOffset = i.Position - self.MainFrame.AbsolutePosition; self.ResizeHandle.Visible = true end end)
-    self.ResizeHandle.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then resizing = true; resizeStartSize = self.MainFrame.AbsoluteSize; resizeStartPos = i.Position end end)
-    UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then if dragging then dragging = false; self.ResizeHandle.Visible = false end; if resizing then resizing = false end end end)
+    
+    self.DragHandle.InputBegan:Connect(function(i) 
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then 
+            dragging = true 
+            -- Calculate offset from the frame's top-left corner
+            dragOffset = i.Position - self.MainFrame.AbsolutePosition
+            self.ResizeHandle.Visible = true 
+        end 
+    end)
+    
+    self.ResizeHandle.InputBegan:Connect(function(i) 
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then 
+            resizing = true 
+            resizeStartSize = self.MainFrame.AbsoluteSize 
+            resizeStartPos = i.Position 
+        end 
+    end)
+    
+    UserInputService.InputEnded:Connect(function(i) 
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then 
+            if dragging then dragging = false; self.ResizeHandle.Visible = false end 
+            if resizing then resizing = false end 
+        end 
+    end)
+    
     UserInputService.InputChanged:Connect(function(i)
-        if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then self.MainFrame.Position = UDim2.new(0, i.Position.X - dragOffset.X, 0, i.Position.Y - dragOffset.Y) end
+        if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then 
+            -- Apply offset correctly so it doesn't jump
+            self.MainFrame.Position = UDim2.new(0, i.Position.X - dragOffset.X, 0, i.Position.Y - dragOffset.Y) 
+        end
         if resizing and i.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = i.Position - resizeStartPos
+            -- Use .X and .Y explicitly to avoid Vector3 errors
+            local delta = Vector2.new(i.Position.X - resizeStartPos.X, i.Position.Y - resizeStartPos.Y)
             self.MainFrame.Size = UDim2.new(0, math.clamp(resizeStartSize.X + delta.X, 600, 1200), 0, math.clamp(resizeStartSize.Y + delta.Y, 400, 800))
         end
     end)
