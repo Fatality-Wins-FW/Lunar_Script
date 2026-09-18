@@ -96,7 +96,8 @@ function Library:AddTab(name)
     local content = Create("ScrollingFrame", {Size = UDim2.new(1, -20, 1, -20), Position = UDim2.new(0, 10, 0, 10), BackgroundTransparency = 1, ScrollBarThickness = 4, ScrollBarImageColor3 = self.Config.AccentColor, Visible = false, CanvasSize = UDim2.new(0, 0, 0, 0), Parent = self.ContentContainer})
     
     local data = {Btn = btn, Cont = content, Y = 0}
-    btn.MouseButton1Click:Connect(function()
+    
+    local function selectTab()
         if self.CurrentTab then
             self.CurrentTab.Btn.BackgroundColor3 = Color3.fromRGB(30, 28, 28)
             self.CurrentTab.Btn.TextColor3 = Color3.fromRGB(150, 150, 150)
@@ -106,9 +107,14 @@ function Library:AddTab(name)
         btn.BackgroundColor3 = self.Config.AccentColor
         btn.TextColor3 = self.Config.TextColor
         content.Visible = true
-    end)
+    end
+
+    btn.MouseButton1Click:Connect(selectTab)
     table.insert(self.Tabs, data)
-    if #self.Tabs == 1 then btn.MouseButton1Click:Connect(function() end); btn.MouseButton1Click:Fire() end
+    
+    -- FIXED: Directly call the function instead of using :Fire()
+    if #self.Tabs == 1 then selectTab() end
+    
     return data
 end
 
