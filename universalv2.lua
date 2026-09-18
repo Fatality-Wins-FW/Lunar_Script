@@ -1,5 +1,5 @@
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Fatality-Wins-FW/Lunar_Script/refs/heads/main/Libary/libary.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/Fatality-Wins-FW/Lunar_Script/refs/heads/main/Libary/save_manager.lua"))()
+local Library = loadstring(game:HttpGet("github raw link"))()
+local SaveManager = loadstring(game:HttpGet("github raw link"))()
 
 if not Library then error("Failed to load Lunar Library") end
 
@@ -40,7 +40,6 @@ UI:AddTextbox(settingsSec, {Name = "Username", Placeholder = "Enter username..."
 
 SaveManager:BuildConfigSection(settingsSec)
 
--- ADDED UNLOAD BUTTON HERE
 UI:AddButton(settingsSec, {Name = "Unload Script", Callback = function() UI:Unload() end})
 
 SaveManager:LoadAutoloadConfig()
