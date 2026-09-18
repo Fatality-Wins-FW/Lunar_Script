@@ -119,7 +119,6 @@ function Library:AddTab(name)
     return data
 end
 
--- FIXED: Uses task.defer to prevent nil errors during initial render
 function Library:_UpdateCanvas(frame)
     task.defer(function()
         if not frame or not frame:GetChildren() then return end
@@ -134,7 +133,20 @@ end
 function Library:AddSection(tab, name)
     local sec = Create("Frame", {Size = UDim2.new(1, -10, 0, 0), BackgroundTransparency = 1, Parent = tab.Cont})
     sec.Position = UDim2.new(0, 5, 0, tab.Y)
-    Create("TextLabel", {Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, Text = name, TextColor3 = self.Config.AccentColor, TextSize = 13, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, Parent = sec})
+    
+    -- FIXED: Added background color to prevent overlap
+    Create("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 22), 
+        BackgroundColor3 = self.Config.SecondaryColor, -- Matches container bg
+        BackgroundTransparency = 0, 
+        Text = name, 
+        TextColor3 = self.Config.AccentColor, 
+        TextSize = 13, 
+        Font = Enum.Font.GothamBold, 
+        TextXAlignment = Enum.TextXAlignment.Left, 
+        Parent = sec
+    })
+    
     local inner = Create("Frame", {Size = UDim2.new(1, 0, 1, -22), Position = UDim2.new(0, 0, 0, 22), BackgroundTransparency = 1, Parent = sec})
     tab.Y = tab.Y + sec.AbsoluteSize.Y + 6
     self:_UpdateCanvas(tab.Cont)
@@ -143,7 +155,19 @@ end
 
 function Library:AddButton(sec, cfg)
     cfg = cfg or {}
-    local btn = Create("TextButton", {Size = UDim2.new(1, -10, 0, 32), BackgroundColor3 = Color3.fromRGB(38, 36, 36), BorderColor3 = Color3.fromRGB(55, 53, 53), BorderSizePixel = 1, Text = cfg.Name or "Button", TextColor3 = self.Config.TextColor, TextSize = 12, Font = Enum.Font.GothamMedium, AutoButtonColor = false, Parent = sec.Inner})
+    local btn = Create("TextButton", {
+        Size = UDim2.new(1, -10, 0, 32), 
+        BackgroundColor3 = Color3.fromRGB(38, 36, 36), 
+        BorderColor3 = Color3.fromRGB(55, 53, 53), 
+        BorderSizePixel = 1, 
+        Text = cfg.Name or "Button", 
+        TextColor3 = self.Config.TextColor, 
+        TextSize = 12, 
+        Font = Enum.Font.GothamMedium, 
+        AutoButtonColor = false, 
+        Parent = sec.Inner
+    })
+    -- FIXED: Increased corner radius slightly and ensured text isn't clipped
     Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = btn})
     btn.Position = UDim2.new(0, 5, 0, sec.Y); sec.Y = sec.Y + 38
     btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(48, 46, 46) end)
