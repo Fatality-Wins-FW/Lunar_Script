@@ -89,6 +89,7 @@ function Library:Notify(title, message, duration)
     end)
 end
 
+-- FIXED ADDTAB FUNCTION: No :Fire() used anywhere
 function Library:AddTab(name)
     local btn = Create("TextButton", {Size = UDim2.new(1, -12, 0, 36), Position = UDim2.new(0, 6, 0, (#self.Tabs * 40) + 6), BackgroundColor3 = Color3.fromRGB(30, 28, 28), BorderSizePixel = 0, Text = name, TextColor3 = Color3.fromRGB(150, 150, 150), TextSize = 13, Font = Enum.Font.GothamMedium, AutoButtonColor = false, Parent = self.TabContainer})
     Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
@@ -97,7 +98,8 @@ function Library:AddTab(name)
     
     local data = {Btn = btn, Cont = content, Y = 0}
     
-    local function selectTab()
+    -- Define selection logic as a standalone function
+    local function selectThisTab()
         if self.CurrentTab then
             self.CurrentTab.Btn.BackgroundColor3 = Color3.fromRGB(30, 28, 28)
             self.CurrentTab.Btn.TextColor3 = Color3.fromRGB(150, 150, 150)
@@ -109,11 +111,14 @@ function Library:AddTab(name)
         content.Visible = true
     end
 
-    btn.MouseButton1Click:Connect(selectTab)
+    -- Connect the click event to the function
+    btn.MouseButton1Click:Connect(selectThisTab)
     table.insert(self.Tabs, data)
     
-    -- FIXED: Directly call the function instead of using :Fire()
-    if #self.Tabs == 1 then selectTab() end
+    -- Directly call the function for the first tab instead of firing a signal
+    if #self.Tabs == 1 then 
+        selectThisTab() 
+    end
     
     return data
 end
