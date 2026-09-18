@@ -134,10 +134,10 @@ function Library:AddSection(tab, name)
     local sec = Create("Frame", {Size = UDim2.new(1, -10, 0, 0), BackgroundTransparency = 1, Parent = tab.Cont})
     sec.Position = UDim2.new(0, 5, 0, tab.Y)
     
-    -- FIXED: Added background color to prevent overlap
+    -- FIXED: Added background color to prevent overlap with components below
     Create("TextLabel", {
         Size = UDim2.new(1, 0, 0, 22), 
-        BackgroundColor3 = self.Config.SecondaryColor, -- Matches container bg
+        BackgroundColor3 = self.Config.SecondaryColor, 
         BackgroundTransparency = 0, 
         Text = name, 
         TextColor3 = self.Config.AccentColor, 
@@ -167,7 +167,6 @@ function Library:AddButton(sec, cfg)
         AutoButtonColor = false, 
         Parent = sec.Inner
     })
-    -- FIXED: Increased corner radius slightly and ensured text isn't clipped
     Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = btn})
     btn.Position = UDim2.new(0, 5, 0, sec.Y); sec.Y = sec.Y + 38
     btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(48, 46, 46) end)
@@ -335,7 +334,7 @@ function Library:_SetupDragResize()
             self.MainFrame.Position = UDim2.new(0, i.Position.X - dragOffset.X, 0, i.Position.Y - dragOffset.Y) 
         end
         if resizing and i.UserInputType == Enum.UserInputType.MouseMovement then
-            -- Use .X and .Y explicitly to avoid Vector3 errors
+            -- FIXED: Explicitly use .X and .Y to avoid Vector3 errors
             local delta = Vector2.new(i.Position.X - resizeStartPos.X, i.Position.Y - resizeStartPos.Y)
             self.MainFrame.Size = UDim2.new(0, math.clamp(resizeStartSize.X + delta.X, 600, 1200), 0, math.clamp(resizeStartSize.Y + delta.Y, 400, 800))
         end
