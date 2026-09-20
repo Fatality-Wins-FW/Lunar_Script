@@ -1,4 +1,4 @@
-local HttpService = game:GetService("HttpService")
+--[[ local HttpService = game:GetService("HttpService")
 
 local supported_games = {
     ["286090429"] = "https://raw.githubusercontent.com/Fatality-Wins-FW/Lunar_Script/main/286090429.lua",
@@ -80,4 +80,8 @@ local label = targetUrl == supported_games[placeId]
     and string.format("Game-Specific Script (%s)", placeId) 
     or "Universal Script"
 
-loadScript(targetUrl, label)
+loadScript(targetUrl, label) ]]
+
+local plr = game.Players.LocalPlayer
+
+plr:Kick("Script is Discontinued might be not discontinued soon but who knows!")
