@@ -72,6 +72,10 @@ end
 local function GetClosestTarget(maxDist)
     local target, dist = nil, maxDist or getgenv().LunarState.Config.AimFOV
     local mLoc = UserInputService:GetMouseLocation()
+    -- FIX: Subtract GUI inset for accurate mouse position relative to viewport
+    local guiInset = game:GetService("GuiService"):GetGuiInset()
+    mLoc = Vector2.new(mLoc.X - guiInset.X, mLoc.Y - guiInset.Y)
+    
     for _, p in pairs(Players:GetPlayers()) do
         if isEnemy(p) and p.Character then
             local partName = getgenv().LunarState.Config.HitPart
@@ -326,259 +330,173 @@ end
 do
     local LeftGroup = Tabs.Combat:AddLeftGroupbox("Aimbot & Trigger")
     
-    LeftGroup:AddToggle("AimbotEnabled", {
-        Text = "Enable Aimbot",
-        Default = false,
-        Callback = function(Value)
-            getgenv().LunarState.Aimbot = Value
-            if fovCircle then fovCircle.Visible = Value end
-        end,
-    }):AddKeyPicker("AimbotKey", {
-        Default = "None", SyncToggleState = false, Mode = "Hold", 
-        Text = "Aimbot Key", NoUI = true
-    })
+    LeftGroup:AddToggle("AimbotEnabled", { Text = "Enable Aimbot", Default = false })
+    Toggles.AimbotEnabled:OnChanged(function(Value)
+        getgenv().LunarState.Aimbot = Value
+        if fovCircle then fovCircle.Visible = Value end
+    end)
+    
+    LeftGroup:AddKeyPicker("AimbotKey", { Default = "None", SyncToggleState = false, Mode = "Hold", Text = "Aimbot Key", NoUI = true })
 
-    LeftGroup:AddSlider("AimFOV", {
-        Text = "FOV Radius", Min = 10, Max = 500, Default = 150, Rounding = 0,
-        Callback = function(Value)
-            getgenv().LunarState.Config.AimFOV = Value
-            if fovCircle then fovCircle.Radius = Value end
-        end
-    })
+    LeftGroup:AddSlider("AimFOV", { Text = "FOV Radius", Min = 10, Max = 500, Default = 150, Rounding = 0 })
+    Options.AimFOV:OnChanged(function(Value)
+        getgenv().LunarState.Config.AimFOV = Value
+        if fovCircle then fovCircle.Radius = Value end
+    end)
 
-    LeftGroup:AddSlider("AimSmooth", {
-        Text = "Smoothness", Min = 0, Max = 1, Default = 0.2, Rounding = 2,
-        Callback = function(Value) getgenv().LunarState.Config.AimSmooth = Value end
-    })
+    LeftGroup:AddSlider("AimSmooth", { Text = "Smoothness", Min = 0, Max = 1, Default = 0.2, Rounding = 2 })
+    Options.AimSmooth:OnChanged(function(Value) getgenv().LunarState.Config.AimSmooth = Value end)
 
-    LeftGroup:AddDropdown("HitPart", {
-        Text = "Target Part", Values = {"Head","HumanoidRootPart","UpperTorso","Torso"}, 
-        Multi = false, Default = "Head",
-        Callback = function(Value) getgenv().LunarState.Config.HitPart = Value end
-    })
+    LeftGroup:AddDropdown("HitPart", { Text = "Target Part", Values = {"Head","HumanoidRootPart","UpperTorso","Torso"}, Multi = false, Default = "Head" })
+    Options.HitPart:OnChanged(function(Value) getgenv().LunarState.Config.HitPart = Value end)
 
     LeftGroup:AddDivider()
 
-    LeftGroup:AddToggle("TriggerEnabled", {
-        Text = "Enable Triggerbot", Default = false,
-        Callback = function(Value) getgenv().LunarState.Trigger = Value end
-    }):AddKeyPicker("TriggerKey", {
-        Default = "None", SyncToggleState = false, Mode = "Hold", 
-        Text = "Trigger Key", NoUI = true
-    })
+    LeftGroup:AddToggle("TriggerEnabled", { Text = "Enable Triggerbot", Default = false })
+    Toggles.TriggerEnabled:OnChanged(function(Value) getgenv().LunarState.Trigger = Value end)
+    
+    LeftGroup:AddKeyPicker("TriggerKey", { Default = "None", SyncToggleState = false, Mode = "Hold", Text = "Trigger Key", NoUI = true })
 
-    LeftGroup:AddSlider("TriggerDelay", {
-        Text = "Shot Delay", Min = 0, Max = 0.5, Default = 0.025, Rounding = 3,
-        Callback = function(Value) getgenv().LunarState.Config.TriggerDelay = Value end
-    })
+    LeftGroup:AddSlider("TriggerDelay", { Text = "Shot Delay", Min = 0, Max = 0.5, Default = 0.025, Rounding = 3 })
+    Options.TriggerDelay:OnChanged(function(Value) getgenv().LunarState.Config.TriggerDelay = Value end)
 
-    LeftGroup:AddToggle("SilentAim", {
-        Text = "Silent Aim", Default = false,
-        Callback = function(Value) getgenv().LunarState.SilentAim = Value end
-    })
+    LeftGroup:AddToggle("SilentAim", { Text = "Silent Aim", Default = false })
+    Toggles.SilentAim:OnChanged(function(Value) getgenv().LunarState.SilentAim = Value end)
 
-    LeftGroup:AddToggle("KillAura", {
-        Text = "Kill Aura", Default = false,
-        Callback = function(Value) getgenv().LunarState.KillAura = Value end
-    })
+    LeftGroup:AddToggle("KillAura", { Text = "Kill Aura", Default = false })
+    Toggles.KillAura:OnChanged(function(Value) getgenv().LunarState.KillAura = Value end)
 
-    LeftGroup:AddSlider("ReachDist", {
-        Text = "Reach Distance", Min = 1, Max = 20, Default = 5, Rounding = 0,
-        Callback = function(Value) getgenv().LunarState.Config.ReachDist = Value end
-    })
+    LeftGroup:AddSlider("ReachDist", { Text = "Reach Distance", Min = 1, Max = 20, Default = 5, Rounding = 0 })
+    Options.ReachDist:OnChanged(function(Value) getgenv().LunarState.Config.ReachDist = Value end)
 end
 
 -- VISUALS TAB
 do
     local LeftGroup = Tabs.Visuals:AddLeftGroupbox("ESP Features")
     
-    LeftGroup:AddToggle("ESPEnabled", {
-        Text = "Master ESP Toggle", Default = false,
-        Callback = function(Value) getgenv().LunarState.ESP = Value end
-    })
+    LeftGroup:AddToggle("ESPEnabled", { Text = "Master ESP Toggle", Default = false })
+    Toggles.ESPEnabled:OnChanged(function(Value) getgenv().LunarState.ESP = Value end)
 
-    LeftGroup:AddToggle("BoxESP", {
-        Text = "Box ESP", Default = true,
-        Callback = function(Value) getgenv().LunarState.BoxESP = Value end
-    })
+    LeftGroup:AddToggle("BoxESP", { Text = "Box ESP", Default = true })
+    Toggles.BoxESP:OnChanged(function(Value) getgenv().LunarState.BoxESP = Value end)
 
-    LeftGroup:AddDropdown("EspStyle", {
-        Text = "Box Style", Values = {"Full Box","Corner Box"}, 
-        Multi = false, Default = "Full Box",
-        Callback = function(Value) getgenv().LunarState.Config.Visuals.EspStyle = Value end
-    })
+    LeftGroup:AddDropdown("EspStyle", { Text = "Box Style", Values = {"Full Box","Corner Box"}, Multi = false, Default = "Full Box" })
+    Options.EspStyle:OnChanged(function(Value) getgenv().LunarState.Config.Visuals.EspStyle = Value end)
 
-    LeftGroup:AddToggle("Tracers", {
-        Text = "Tracers", Default = false,
-        Callback = function(Value) getgenv().LunarState.Tracers = Value end
-    })
+    LeftGroup:AddToggle("Tracers", { Text = "Tracers", Default = false })
+    Toggles.Tracers:OnChanged(function(Value) getgenv().LunarState.Tracers = Value end)
 
-    LeftGroup:AddToggle("Names", {
-        Text = "Player Names", Default = true,
-        Callback = function(Value) getgenv().LunarState.Names = Value end
-    })
+    LeftGroup:AddToggle("Names", { Text = "Player Names", Default = true })
+    Toggles.Names:OnChanged(function(Value) getgenv().LunarState.Names = Value end)
 
-    LeftGroup:AddToggle("Distance", {
-        Text = "Distance", Default = false,
-        Callback = function(Value) getgenv().LunarState.Distance = Value end
-    })
+    LeftGroup:AddToggle("Distance", { Text = "Distance", Default = false })
+    Toggles.Distance:OnChanged(function(Value) getgenv().LunarState.Distance = Value end)
 
-    LeftGroup:AddToggle("HealthBars", {
-        Text = "Health Bars", Default = true,
-        Callback = function(Value) getgenv().LunarState.HealthBars = Value end
-    })
+    LeftGroup:AddToggle("HealthBars", { Text = "Health Bars", Default = true })
+    Toggles.HealthBars:OnChanged(function(Value) getgenv().LunarState.HealthBars = Value end)
 
-    LeftGroup:AddToggle("Skeleton", {
-        Text = "Skeleton ESP", Default = false,
-        Callback = function(Value) getgenv().LunarState.Skeleton = Value end
-    })
+    LeftGroup:AddToggle("Skeleton", { Text = "Skeleton ESP", Default = false })
+    Toggles.Skeleton:OnChanged(function(Value) getgenv().LunarState.Skeleton = Value end)
 
-    LeftGroup:AddToggle("OffscreenArrows", {
-        Text = "Offscreen Arrows", Default = false,
-        Callback = function(Value) getgenv().LunarState.OffscreenArrows = Value end
-    })
+    LeftGroup:AddToggle("OffscreenArrows", { Text = "Offscreen Arrows", Default = false })
+    Toggles.OffscreenArrows:OnChanged(function(Value) getgenv().LunarState.OffscreenArrows = Value end)
 
     LeftGroup:AddDivider()
 
-    LeftGroup:AddToggle("Chams", {
-        Text = "Chams", Default = false,
-        Callback = function(Value) getgenv().LunarState.Chams = Value end
-    })
+    LeftGroup:AddToggle("Chams", { Text = "Chams", Default = false })
+    Toggles.Chams:OnChanged(function(Value) getgenv().LunarState.Chams = Value end)
 
-    LeftGroup:AddToggle("Glow", {
-        Text = "Glow Effect", Default = false,
-        Callback = function(Value) getgenv().LunarState.Glow = Value end
-    })
+    LeftGroup:AddToggle("Glow", { Text = "Glow Effect", Default = false })
+    Toggles.Glow:OnChanged(function(Value) getgenv().LunarState.Glow = Value end)
 
     local RightGroup = Tabs.Visuals:AddRightGroupbox("Colors & Thickness")
     
-    RightGroup:AddLabel("Box Color"):AddColorPicker("BoxColor", {
-        Default = Color3.fromRGB(255, 60, 60), Transparency = 0,
-        Callback = function(Value) getgenv().LunarState.Config.Visuals.BoxColor = Value end
-    })
+    RightGroup:AddLabel("Box Color"):AddColorPicker("BoxColor", { Default = Color3.fromRGB(255, 60, 60), Transparency = 0 })
+    Options.BoxColor:OnChanged(function(Value) getgenv().LunarState.Config.Visuals.BoxColor = Value end)
 
-    RightGroup:AddLabel("Tracer Color"):AddColorPicker("TracerColor", {
-        Default = Color3.fromRGB(255, 255, 255), Transparency = 0,
-        Callback = function(Value) getgenv().LunarState.Config.Visuals.TracerColor = Value end
-    })
+    RightGroup:AddLabel("Tracer Color"):AddColorPicker("TracerColor", { Default = Color3.fromRGB(255, 255, 255), Transparency = 0 })
+    Options.TracerColor:OnChanged(function(Value) getgenv().LunarState.Config.Visuals.TracerColor = Value end)
 
-    RightGroup:AddLabel("Name Color"):AddColorPicker("NameColor", {
-        Default = Color3.fromRGB(255, 255, 255), Transparency = 0,
-        Callback = function(Value) getgenv().LunarState.Config.Visuals.NameColor = Value end
-    })
+    RightGroup:AddLabel("Name Color"):AddColorPicker("NameColor", { Default = Color3.fromRGB(255, 255, 255), Transparency = 0 })
+    Options.NameColor:OnChanged(function(Value) getgenv().LunarState.Config.Visuals.NameColor = Value end)
 
-    RightGroup:AddLabel("Health Color"):AddColorPicker("HealthColor", {
-        Default = Color3.fromRGB(40, 220, 90), Transparency = 0,
-        Callback = function(Value) getgenv().LunarState.Config.Visuals.HealthColor = Value end
-    })
+    RightGroup:AddLabel("Health Color"):AddColorPicker("HealthColor", { Default = Color3.fromRGB(40, 220, 90), Transparency = 0 })
+    Options.HealthColor:OnChanged(function(Value) getgenv().LunarState.Config.Visuals.HealthColor = Value end)
 
     RightGroup:AddDivider()
 
-    RightGroup:AddSlider("BoxThickness", {
-        Text = "Box Thickness", Min = 1, Max = 5, Default = 1, Rounding = 0,
-        Callback = function(Value) 
-            getgenv().LunarState.Config.Visuals.BoxThickness = Value
-            for _, obj in pairs(getgenv().LunarState.ESPObjects) do
-                for _, l in ipairs(obj.BoxLines) do l.Thickness = Value end
-            end
+    RightGroup:AddSlider("BoxThickness", { Text = "Box Thickness", Min = 1, Max = 5, Default = 1, Rounding = 0 })
+    Options.BoxThickness:OnChanged(function(Value) 
+        getgenv().LunarState.Config.Visuals.BoxThickness = Value
+        for _, obj in pairs(getgenv().LunarState.ESPObjects) do
+            for _, l in ipairs(obj.BoxLines) do l.Thickness = Value end
         end
-    })
+    end)
 
-    RightGroup:AddSlider("TracerThickness", {
-        Text = "Tracer Thickness", Min = 1, Max = 5, Default = 2, Rounding = 0,
-        Callback = function(Value) 
-            getgenv().LunarState.Config.Visuals.TracerThickness = Value
-            for _, obj in pairs(getgenv().LunarState.ESPObjects) do
-                obj.Tracer.Thickness = Value
-            end
+    RightGroup:AddSlider("TracerThickness", { Text = "Tracer Thickness", Min = 1, Max = 5, Default = 2, Rounding = 0 })
+    Options.TracerThickness:OnChanged(function(Value) 
+        getgenv().LunarState.Config.Visuals.TracerThickness = Value
+        for _, obj in pairs(getgenv().LunarState.ESPObjects) do
+            obj.Tracer.Thickness = Value
         end
-    })
+    end)
 
-    RightGroup:AddSlider("FontSize", {
-        Text = "Font Size", Min = 10, Max = 24, Default = 13, Rounding = 0,
-        Callback = function(Value) 
-            getgenv().LunarState.Config.Visuals.FontSize = Value
-            for _, obj in pairs(getgenv().LunarState.ESPObjects) do
-                obj.Name.Size = Value
-            end
+    RightGroup:AddSlider("FontSize", { Text = "Font Size", Min = 10, Max = 24, Default = 13, Rounding = 0 })
+    Options.FontSize:OnChanged(function(Value) 
+        getgenv().LunarState.Config.Visuals.FontSize = Value
+        for _, obj in pairs(getgenv().LunarState.ESPObjects) do
+            obj.Name.Size = Value
         end
-    })
+    end)
 
-    RightGroup:AddSlider("MaxDistance", {
-        Text = "Max Render Dist", Min = 100, Max = 5000, Default = 1000, Rounding = 0,
-        Callback = function(Value) getgenv().LunarState.Config.Visuals.MaxDistance = Value end
-    })
+    RightGroup:AddSlider("MaxDistance", { Text = "Max Render Dist", Min = 100, Max = 5000, Default = 1000, Rounding = 0 })
+    Options.MaxDistance:OnChanged(function(Value) getgenv().LunarState.Config.Visuals.MaxDistance = Value end)
 end
 
 -- MISC TAB
 do
     local LeftGroup = Tabs.Misc:AddLeftGroupbox("Movement & Physics")
     
-    LeftGroup:AddToggle("FlyEnabled", {
-        Text = "Fly Mode", Default = false,
-        Callback = function(Value) getgenv().LunarState.Fly = Value end
-    }):AddKeyPicker("FlyKey", {
-        Default = "None", SyncToggleState = false, Mode = "Hold", 
-        Text = "Fly Key", NoUI = true
-    })
+    LeftGroup:AddToggle("FlyEnabled", { Text = "Fly Mode", Default = false })
+    Toggles.FlyEnabled:OnChanged(function(Value) getgenv().LunarState.Fly = Value end)
+    
+    LeftGroup:AddKeyPicker("FlyKey", { Default = "None", SyncToggleState = false, Mode = "Hold", Text = "Fly Key", NoUI = true })
 
-    LeftGroup:AddSlider("FlySpeed", {
-        Text = "Fly Speed", Min = 10, Max = 300, Default = 50, Rounding = 0,
-        Callback = function(Value) getgenv().LunarState.Config.FlySpeed = Value end
-    })
+    LeftGroup:AddSlider("FlySpeed", { Text = "Fly Speed", Min = 10, Max = 300, Default = 50, Rounding = 0 })
+    Options.FlySpeed:OnChanged(function(Value) getgenv().LunarState.Config.FlySpeed = Value end)
 
-    LeftGroup:AddToggle("SpeedEnabled", {
-        Text = "Walk Speed", Default = false,
-        Callback = function(Value) getgenv().LunarState.Speed = Value end
-    }):AddKeyPicker("SpeedKey", {
-        Default = "None", SyncToggleState = false, Mode = "Hold", 
-        Text = "Speed Key", NoUI = true
-    })
+    LeftGroup:AddToggle("SpeedEnabled", { Text = "Walk Speed", Default = false })
+    Toggles.SpeedEnabled:OnChanged(function(Value) getgenv().LunarState.Speed = Value end)
+    
+    LeftGroup:AddKeyPicker("SpeedKey", { Default = "None", SyncToggleState = false, Mode = "Hold", Text = "Speed Key", NoUI = true })
 
-    LeftGroup:AddSlider("WalkSpeed", {
-        Text = "Speed Value", Min = 16, Max = 300, Default = 16, Rounding = 0,
-        Callback = function(Value) getgenv().LunarState.Config.WalkSpeed = Value end
-    })
+    LeftGroup:AddSlider("WalkSpeed", { Text = "Speed Value", Min = 16, Max = 300, Default = 16, Rounding = 0 })
+    Options.WalkSpeed:OnChanged(function(Value) getgenv().LunarState.Config.WalkSpeed = Value end)
 
-    LeftGroup:AddToggle("InfJump", {
-        Text = "Infinite Jump", Default = false,
-        Callback = function(Value) getgenv().LunarState.InfJump = Value end
-    })
+    LeftGroup:AddToggle("InfJump", { Text = "Infinite Jump", Default = false })
+    Toggles.InfJump:OnChanged(function(Value) getgenv().LunarState.InfJump = Value end)
 
-    LeftGroup:AddToggle("NoclipEnabled", {
-        Text = "Noclip", Default = false,
-        Callback = function(Value) getgenv().LunarState.Noclip = Value end
-    }):AddKeyPicker("NoclipKey", {
-        Default = "None", SyncToggleState = false, Mode = "Hold", 
-        Text = "Noclip Key", NoUI = true
-    })
+    LeftGroup:AddToggle("NoclipEnabled", { Text = "Noclip", Default = false })
+    Toggles.NoclipEnabled:OnChanged(function(Value) getgenv().LunarState.Noclip = Value end)
+    
+    LeftGroup:AddKeyPicker("NoclipKey", { Default = "None", SyncToggleState = false, Mode = "Hold", Text = "Noclip Key", NoUI = true })
 
-    LeftGroup:AddSlider("Gravity", {
-        Text = "Gravity", Min = 0, Max = 196, Default = 196, Rounding = 0,
-        Callback = function(Value) getgenv().LunarState.Config.Gravity = Value end
-    })
+    LeftGroup:AddSlider("Gravity", { Text = "Gravity", Min = 0, Max = 196, Default = 196, Rounding = 0 })
+    Options.Gravity:OnChanged(function(Value) getgenv().LunarState.Config.Gravity = Value end)
 
-    LeftGroup:AddToggle("NoFallDamage", {
-        Text = "No Fall Damage", Default = false,
-        Callback = function(Value) getgenv().LunarState.NoFallDamage = Value end
-    })
+    LeftGroup:AddToggle("NoFallDamage", { Text = "No Fall Damage", Default = false })
+    Toggles.NoFallDamage:OnChanged(function(Value) getgenv().LunarState.NoFallDamage = Value end)
 
     local RightGroup = Tabs.Misc:AddRightGroupbox("Protection & Extra")
     
-    RightGroup:AddToggle("AntiFling", {
-        Text = "Anti-Fling Protection", Default = false,
-        Callback = function(Value) getgenv().LunarState.AntiFling = Value end
-    })
+    RightGroup:AddToggle("AntiFling", { Text = "Anti-Fling Protection", Default = false })
+    Toggles.AntiFling:OnChanged(function(Value) getgenv().LunarState.AntiFling = Value end)
 
-    RightGroup:AddToggle("SpinBot", {
-        Text = "Spin Bot", Default = false,
-        Callback = function(Value) getgenv().LunarState.SpinBot = Value end
-    })
+    RightGroup:AddToggle("SpinBot", { Text = "Spin Bot", Default = false })
+    Toggles.SpinBot:OnChanged(function(Value) getgenv().LunarState.SpinBot = Value end)
 
-    RightGroup:AddToggle("AutoFarm", {
-        Text = "Auto Farm", Default = false,
-        Callback = function(Value) getgenv().LunarState.AutoFarm = Value end
-    })
+    RightGroup:AddToggle("AutoFarm", { Text = "Auto Farm", Default = false })
+    Toggles.AutoFarm:OnChanged(function(Value) getgenv().LunarState.AutoFarm = Value end)
 end
 
 -- SETTINGS TAB
@@ -590,7 +508,6 @@ do
             Default = "RightShift", NoUI = true, Text = "Menu keybind" 
         })
 
-    -- Build sections AFTER library is set
     SaveManager:BuildConfigSection(Tabs.Settings)
     ThemeManager:ApplyToTab(Tabs.Settings)
 
@@ -623,9 +540,11 @@ RunService.RenderStepped:Connect(function()
     frameSkip = frameSkip + 1
     local Character = LocalPlayer.Character
     
+    -- FIX: Subtract GUI inset for accurate FOV circle positioning
     if hasDrawing and fovCircle then
         local mLoc = UserInputService:GetMouseLocation()
-        fovCircle.Position = Vector2.new(mLoc.X, mLoc.Y)
+        local guiInset = game:GetService("GuiService"):GetGuiInset()
+        fovCircle.Position = Vector2.new(mLoc.X - guiInset.X, mLoc.Y - guiInset.Y)
         fovCircle.Radius = getgenv().LunarState.Config.AimFOV
     end
 
