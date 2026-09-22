@@ -1,77 +1,57 @@
-print("[Lunar] Initializing Universal Script V1...")
+print("[Lunar] Initializing Universal Script V2...")
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
-local StarterGui = game:GetService("StarterGui")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
-if CoreGui:FindFirstChild("Lunar_Universal_V1") then 
-    CoreGui.Lunar_Universal_V1:Destroy() 
-end
-
-getgenv().LunarRunning = true
+-- STATE MANAGEMENT
 getgenv().LunarState = {
-    Aimbot = false, Trigger = false, SilentAim = false, ESP = false, Tracers = false, 
-    Chams = false, Skeleton = false, Names = false, HealthBars = false, Distance = false,
-    Fly = false, Speed = false, JumpPower = false, Noclip = false, InfJump = false,
-    GodMode = false, AntiAim = false, SpinBot = false, FastDrown = false, NoFallDamage = false,
-    AutoFarm = false, Reach = false, KillAura = false, ChatSpam = false, FakeLag = false,
-    Dropkick = false, ImageCrash = false, AntiFling = false,
-    Lines = {},
+    Aimbot = false, SilentAim = false, Trigger = false, KillAura = false, Reach = false,
+    ESP = false, BoxESP = false, Tracers = false, Names = false, Distance = false, 
+    HealthBars = false, Skeleton = false, Chams = false, Glow = false, OffscreenArrows = false,
+    Fly = false, Speed = false, InfJump = false, Noclip = false, NoFallDamage = false,
+    AntiFling = false, AutoFarm = false, SpinBot = false,
     Config = {
-        AimFOV = 150, AimSmoothness = 0.2, HitPart = "Head", TriggerDelay = 0.025,
-        WalkSpeed = 16, JumpPowerVal = 50, FlySpeed = 50, Gravity = 196, ReachDist = 5,
-        AntiAimX = 5, AntiAimY = 5, AntiAimZ = 5,
+        AimFOV = 150, AimSmooth = 0.2, HitPart = "Head", TriggerDelay = 0.025, ReachDist = 5,
+        WalkSpeed = 16, JumpPower = 50, Gravity = 196, FlySpeed = 50,
         Visuals = {
-            BoxColor = Color3.fromRGB(255, 0, 0), TracerColor = Color3.fromRGB(255, 255, 255),
-            ChamsColor = Color3.fromRGB(0, 170, 255), EspStyle = "Full Box",
-            FovThickness = 1, TracerThickness = 2
-        },
-        Keys = {
-            Aimbot = Enum.KeyCode.None, Trigger = Enum.KeyCode.None, Fly = Enum.KeyCode.None,
-            Noclip = Enum.KeyCode.None, Speed = Enum.KeyCode.None, AntiAim = Enum.KeyCode.None
+            BoxColor = Color3.fromRGB(255, 60, 60), TracerColor = Color3.fromRGB(255, 255, 255),
+            NameColor = Color3.fromRGB(255, 255, 255), HealthColor = Color3.fromRGB(40, 220, 90),
+            EspStyle = "Full Box", MaxDistance = 1000,
+            BoxThickness = 1, TracerThickness = 2, FontSize = 13
         }
-    }
+    },
+    Lines = {}, ESPObjects = {}
 }
 
-local MyUI = nil
-local uiVisible = true
-local isShooting = false
-local hasDrawing = pcall(function() Drawing.new("Circle") end)
+-- LIBRARY INITIALIZATION
+local repo = "https://raw.githubusercontent.com/yukvx/ObsidianUi/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 
-local fovCircle = nil
-if hasDrawing then
-    fovCircle = Drawing.new("Circle")
-    fovCircle.Thickness = getgenv().LunarState.Config.Visuals.FovThickness
-    fovCircle.Color = Color3.fromRGB(255, 255, 255)
-    fovCircle.Filled = false
-    fovCircle.Visible = false
-    fovCircle.Radius = getgenv().LunarState.Config.AimFOV
-end
+local Options = Library.Options
+local Toggles = Library.Toggles
 
-local function SyncUI()
-    for _, v in pairs(CoreGui:GetChildren()) do
-        if v:IsA("ScreenGui") and (v.Name == "Linoria" or v:FindFirstChild("Main")) then
-            MyUI = v
-            return v
-        end
-    end
-end
+local Window = Library:CreateWindow({
+    Title = "Lunar",
+    Footer = "Universal V2",
+    NotifySide = "Right",
+    ShowCustomCursor = true,
+})
 
-local function isFeatureActive(featureName)
-    local state = getgenv().LunarState[featureName]
-    local key = getgenv().LunarState.Config.Keys[featureName]
-    if not state then return false end
-    if key and key ~= Enum.KeyCode.None then
-        return UserInputService:IsKeyDown(key)
-    end
-    return true
-end
+local Tabs = {
+    Combat = Window:AddTab("Combat", "crosshair"),
+    Visuals = Window:AddTab("Visuals", "eye"),
+    Misc = Window:AddTab("Misc", "settings-2"),
+    Settings = Window:AddTab("Settings", "settings"),
+}
 
+-- HELPER FUNCTIONS
 local function isEnemy(p)
     if not p or p == LocalPlayer or not p.Character then return false end
     local char = p.Character
@@ -81,42 +61,6 @@ local function isEnemy(p)
     if char:FindFirstChildOfClass("ForceField") then return false end
     return true
 end
-
-local function shoot()
-    if isShooting then return end
-    isShooting = true
-    task.spawn(function()
-        pcall(function()
-            local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-            if tool then
-                local shootFunc = tool:FindFirstChild("Shoot") or tool:FindFirstChild("Fire") or tool:FindFirstChild("shoot") or tool:FindFirstChild("fire")
-                if shootFunc and shootFunc:IsA("RemoteEvent") then
-                    shootFunc:FireServer(Mouse.Hit.Position)
-                elseif shootFunc and shootFunc:IsA("BindableEvent") then
-                    shootFunc:Fire(Mouse.Hit.Position)
-                else
-                    local remote = tool:FindFirstChildOfClass("RemoteEvent")
-                    if remote then remote:FireServer(Mouse.Hit.Position)
-                    else mouse1press(); task.wait(getgenv().LunarState.Config.TriggerDelay); mouse1release() end
-                end
-            else
-                mouse1press(); task.wait(getgenv().LunarState.Config.TriggerDelay); mouse1release()
-            end
-        end)
-        task.wait(getgenv().LunarState.Config.TriggerDelay)
-        isShooting = false
-    end)
-end
-
-local Library = loadstring(game:HttpGet("https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet("https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/addons/ThemeManager.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://github.com/violin-suzutsuki/LinoriaLib/raw/refs/heads/main/addons/SaveManager.lua"))()
-
-Library:SetWatermarkVisibility(false)
-
-local Window = Library:CreateWindow({ Title = "Lunar | Universal | V1", Center = true, AutoShow = true })
-task.wait(0.5)
-SyncUI()
 
 local function GetClosestTarget(maxDist)
     local target, dist = nil, maxDist or getgenv().LunarState.Config.AimFOV
@@ -137,52 +81,65 @@ local function GetClosestTarget(maxDist)
     return target
 end
 
+-- FOV CIRCLE SETUP
+local hasDrawing = pcall(function() Drawing.new("Circle") end)
+local fovCircle = nil
+if hasDrawing then
+    fovCircle = Drawing.new("Circle")
+    fovCircle.Thickness = 1
+    fovCircle.Color = Color3.fromRGB(255, 255, 255)
+    fovCircle.Filled = false
+    fovCircle.Visible = false
+    fovCircle.Radius = getgenv().LunarState.Config.AimFOV
+end
+
+-- ESP SYSTEM V2
 local SkeletonBones = {
     R15 = {{"Head","UpperTorso"},{"UpperTorso","LowerTorso"},{"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},{"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"},{"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},{"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"}},
     R6 = {{"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"}}
 }
 
-local ESPObjects = {}
 local function CreateESPObject(plr)
-    if ESPObjects[plr] then return end
-    
-    local cornerLines, tracer, name, healthBg, healthBar, skeletons = {}, nil, nil, nil, nil, {}
+    if getgenv().LunarState.ESPObjects[plr] then return end
+    local obj = {}
     if hasDrawing then
-        for i=1,8 do local l=Drawing.new("Line"); l.Thickness=1.5; l.Visible=false; table.insert(cornerLines,l) end
-        tracer = Drawing.new("Line"); tracer.Thickness = 1
-        name = Drawing.new("Text"); name.Size = 13; name.Center = true; name.Outline = true
-        healthBg = Drawing.new("Square"); healthBg.Filled = true; healthBg.Color = Color3.fromRGB(10,10,10)
-        healthBar = Drawing.new("Square"); healthBar.Filled = true; healthBar.Color = Color3.fromRGB(40,220,90)
-        for i=1,15 do local l=Drawing.new("Line"); l.Thickness=1.5; table.insert(skeletons,l) end
+        obj.BoxLines = {}
+        for i=1,8 do local l=Drawing.new("Line"); l.Thickness=getgenv().LunarState.Config.Visuals.BoxThickness; table.insert(obj.BoxLines,l) end
+        obj.Tracer = Drawing.new("Line"); obj.Tracer.Thickness = getgenv().LunarState.Config.Visuals.TracerThickness
+        obj.Name = Drawing.new("Text"); obj.Name.Size = getgenv().LunarState.Config.Visuals.FontSize; obj.Name.Center = true; obj.Name.Outline = true
+        obj.HealthBg = Drawing.new("Square"); obj.HealthBg.Filled = true; obj.HealthBg.Color = Color3.fromRGB(10,10,10)
+        obj.HealthBar = Drawing.new("Square"); obj.HealthBar.Filled = true; obj.HealthBar.Color = getgenv().LunarState.Config.Visuals.HealthColor
+        obj.Skeletons = {}
+        for i=1,15 do local l=Drawing.new("Line"); l.Thickness=1.5; table.insert(obj.Skeletons,l) end
+        obj.Arrow = Drawing.new("Triangle"); obj.Arrow.Filled = true; obj.Arrow.Color = getgenv().LunarState.Config.Visuals.BoxColor
     end
-
-    ESPObjects[plr] = {
-        CornerLines = cornerLines, Tracer = tracer, Name = name,
-        HealthBarBg = healthBg, HealthBar = healthBar, Skeletons = skeletons
-    }
+    getgenv().LunarState.ESPObjects[plr] = obj
 end
 
 local function HideESPObject(plr)
-    local obj = ESPObjects[plr]; if not obj or not hasDrawing then return end
-    for _,l in ipairs(obj.CornerLines) do l.Visible=false end
-    obj.Tracer.Visible=false; obj.Name.Visible=false; obj.HealthBarBg.Visible=false; obj.HealthBar.Visible=false
+    local obj = getgenv().LunarState.ESPObjects[plr]; if not obj or not hasDrawing then return end
+    for _,l in ipairs(obj.BoxLines) do l.Visible=false end
+    obj.Tracer.Visible=false; obj.Name.Visible=false; obj.HealthBg.Visible=false; obj.HealthBar.Visible=false
     for _,l in ipairs(obj.Skeletons) do l.Visible=false end
+    obj.Arrow.Visible = false
 end
 
 local function RemoveESPObject(plr)
-    local obj = ESPObjects[plr]; if not obj or not hasDrawing then return end
-    for _,l in ipairs(obj.CornerLines) do l:Remove() end
-    obj.Tracer:Remove(); obj.Name:Remove(); obj.HealthBarBg:Remove(); obj.HealthBar:Remove()
-    for _,l in ipairs(obj.Skeletons) do l:Remove() end
-    ESPObjects[plr] = nil
+    local obj = getgenv().LunarState.ESPObjects[plr]; if not obj or not hasDrawing then return end
+    for _,l in ipairs(obj.BoxLines) do pcall(function() l:Remove() end) end
+    pcall(function() obj.Tracer:Remove() end); pcall(function() obj.Name:Remove() end)
+    pcall(function() obj.HealthBg:Remove() end); pcall(function() obj.HealthBar:Remove() end)
+    for _,l in ipairs(obj.Skeletons) do pcall(function() l:Remove() end) end
+    pcall(function() obj.Arrow:Remove() end)
+    getgenv().LunarState.ESPObjects[plr] = nil
 end
+
 Players.PlayerRemoving:Connect(RemoveESPObject)
 
-local function createEsp(player)
+local function UpdateESP(player)
     if not player.Character then return end
     CreateESPObject(player)
-    
-    local obj = ESPObjects[player]
+    local obj = getgenv().LunarState.ESPObjects[player]
     local char = player.Character
     local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
     local head = char:FindFirstChild("Head")
@@ -207,73 +164,72 @@ local function createEsp(player)
     local style = getgenv().LunarState.Config.Visuals.EspStyle
 
     if hasDrawing and getgenv().LunarState.ESP then
-        if style == "Full Box" then
-            obj.CornerLines[1].From = Vector2.new(topLeftX, topLeftY)
-            obj.CornerLines[1].To = Vector2.new(topLeftX + width, topLeftY)
-            obj.CornerLines[1].Color = color; obj.CornerLines[1].Visible = true
-            
-            obj.CornerLines[2].From = Vector2.new(topLeftX, topLeftY + height)
-            obj.CornerLines[2].To = Vector2.new(topLeftX + width, topLeftY + height)
-            obj.CornerLines[2].Color = color; obj.CornerLines[2].Visible = true
-            
-            obj.CornerLines[3].From = Vector2.new(topLeftX, topLeftY)
-            obj.CornerLines[3].To = Vector2.new(topLeftX, topLeftY + height)
-            obj.CornerLines[3].Color = color; obj.CornerLines[3].Visible = true
-            
-            obj.CornerLines[4].From = Vector2.new(topLeftX + width, topLeftY)
-            obj.CornerLines[4].To = Vector2.new(topLeftX + width, topLeftY + height)
-            obj.CornerLines[4].Color = color; obj.CornerLines[4].Visible = true
-            
-            for i=5,8 do obj.CornerLines[i].Visible = false end
-            
-        elseif style == "Corner Box" then
-            local lineLen = math.clamp(width * 0.25, 4, 15)
-            local topRight = Vector2.new(topLeftX + width, topLeftY)
-            local bottomLeft = Vector2.new(topLeftX, topLeftY + height)
-            local bottomRight = Vector2.new(topLeftX + width, topLeftY + height)
+        if getgenv().LunarState.BoxESP then
+            if style == "Full Box" then
+                obj.BoxLines[1].From = Vector2.new(topLeftX, topLeftY)
+                obj.BoxLines[1].To = Vector2.new(topLeftX + width, topLeftY)
+                obj.BoxLines[1].Color = color; obj.BoxLines[1].Visible = true
+                
+                obj.BoxLines[2].From = Vector2.new(topLeftX, topLeftY + height)
+                obj.BoxLines[2].To = Vector2.new(topLeftX + width, topLeftY + height)
+                obj.BoxLines[2].Color = color; obj.BoxLines[2].Visible = true
+                
+                obj.BoxLines[3].From = Vector2.new(topLeftX, topLeftY)
+                obj.BoxLines[3].To = Vector2.new(topLeftX, topLeftY + height)
+                obj.BoxLines[3].Color = color; obj.BoxLines[3].Visible = true
+                
+                obj.BoxLines[4].From = Vector2.new(topLeftX + width, topLeftY)
+                obj.BoxLines[4].To = Vector2.new(topLeftX + width, topLeftY + height)
+                obj.BoxLines[4].Color = color; obj.BoxLines[4].Visible = true
+                
+                for i=5,8 do obj.BoxLines[i].Visible = false end
+                
+            elseif style == "Corner Box" then
+                local lineLen = math.clamp(width * 0.25, 4, 15)
+                local topRight = Vector2.new(topLeftX + width, topLeftY)
+                local bottomLeft = Vector2.new(topLeftX, topLeftY + height)
+                local bottomRight = Vector2.new(topLeftX + width, topLeftY + height)
 
-            obj.CornerLines[1].From = Vector2.new(topLeftX, topLeftY)
-            obj.CornerLines[1].To = Vector2.new(topLeftX + lineLen, topLeftY)
-            obj.CornerLines[1].Color = color; obj.CornerLines[1].Visible = true
-            
-            obj.CornerLines[2].From = Vector2.new(topLeftX, topLeftY)
-            obj.CornerLines[2].To = Vector2.new(topLeftX, topLeftY + lineLen)
-            obj.CornerLines[2].Color = color; obj.CornerLines[2].Visible = true
+                obj.BoxLines[1].From = Vector2.new(topLeftX, topLeftY)
+                obj.BoxLines[1].To = Vector2.new(topLeftX + lineLen, topLeftY)
+                obj.BoxLines[1].Color = color; obj.BoxLines[1].Visible = true
+                
+                obj.BoxLines[2].From = Vector2.new(topLeftX, topLeftY)
+                obj.BoxLines[2].To = Vector2.new(topLeftX, topLeftY + lineLen)
+                obj.BoxLines[2].Color = color; obj.BoxLines[2].Visible = true
 
-            obj.CornerLines[3].From = topRight
-            obj.CornerLines[3].To = Vector2.new(topRight.X - lineLen, topRight.Y)
-            obj.CornerLines[3].Color = color; obj.CornerLines[3].Visible = true
-            
-            obj.CornerLines[4].From = topRight
-            obj.CornerLines[4].To = Vector2.new(topRight.X, topRight.Y + lineLen)
-            obj.CornerLines[4].Color = color; obj.CornerLines[4].Visible = true
+                obj.BoxLines[3].From = topRight
+                obj.BoxLines[3].To = Vector2.new(topRight.X - lineLen, topRight.Y)
+                obj.BoxLines[3].Color = color; obj.BoxLines[3].Visible = true
+                
+                obj.BoxLines[4].From = topRight
+                obj.BoxLines[4].To = Vector2.new(topRight.X, topRight.Y + lineLen)
+                obj.BoxLines[4].Color = color; obj.BoxLines[4].Visible = true
 
-            obj.CornerLines[5].From = bottomLeft
-            obj.CornerLines[5].To = Vector2.new(bottomLeft.X + lineLen, bottomLeft.Y)
-            obj.CornerLines[5].Color = color; obj.CornerLines[5].Visible = true
-            
-            obj.CornerLines[6].From = bottomLeft
-            obj.CornerLines[6].To = Vector2.new(bottomLeft.X, bottomLeft.Y - lineLen)
-            obj.CornerLines[6].Color = color; obj.CornerLines[6].Visible = true
+                obj.BoxLines[5].From = bottomLeft
+                obj.BoxLines[5].To = Vector2.new(bottomLeft.X + lineLen, bottomLeft.Y)
+                obj.BoxLines[5].Color = color; obj.BoxLines[5].Visible = true
+                
+                obj.BoxLines[6].From = bottomLeft
+                obj.BoxLines[6].To = Vector2.new(bottomLeft.X, bottomLeft.Y - lineLen)
+                obj.BoxLines[6].Color = color; obj.BoxLines[6].Visible = true
 
-            obj.CornerLines[7].From = bottomRight
-            obj.CornerLines[7].To = Vector2.new(bottomRight.X - lineLen, bottomRight.Y)
-            obj.CornerLines[7].Color = color; obj.CornerLines[7].Visible = true
-            
-            obj.CornerLines[8].From = bottomRight
-            obj.CornerLines[8].To = Vector2.new(bottomRight.X, bottomRight.Y - lineLen)
-            obj.CornerLines[8].Color = color; obj.CornerLines[8].Visible = true
+                obj.BoxLines[7].From = bottomRight
+                obj.BoxLines[7].To = Vector2.new(bottomRight.X - lineLen, bottomRight.Y)
+                obj.BoxLines[7].Color = color; obj.BoxLines[7].Visible = true
+                
+                obj.BoxLines[8].From = bottomRight
+                obj.BoxLines[8].To = Vector2.new(bottomRight.X, bottomRight.Y - lineLen)
+                obj.BoxLines[8].Color = color; obj.BoxLines[8].Visible = true
+            end
+        else
+            for i=1,8 do obj.BoxLines[i].Visible = false end
         end
-    elseif hasDrawing then
-        for i=1,8 do obj.CornerLines[i].Visible = false end
-    end
 
-    if hasDrawing then
         if getgenv().LunarState.Tracers then
             obj.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
             obj.Tracer.To = Vector2.new(rootPos.X, rootPos.Y)
             obj.Tracer.Color = getgenv().LunarState.Config.Visuals.TracerColor
-            obj.Tracer.Thickness = getgenv().LunarState.Config.Visuals.TracerThickness
             obj.Tracer.Visible = true
         else obj.Tracer.Visible = false end
         
@@ -284,14 +240,14 @@ local function createEsp(player)
             if getgenv().LunarState.Names then text = player.Name end
             if getgenv().LunarState.Distance then text = text .. (text~="" and " [" or "[") .. dist .. "m]" end
             obj.Name.Text = text; obj.Name.Position = Vector2.new(rootPos.X, topLeftY - 16)
-            obj.Name.Color = Color3.fromRGB(255,255,255); obj.Name.Visible = true
+            obj.Name.Color = getgenv().LunarState.Config.Visuals.NameColor; obj.Name.Visible = true
         else obj.Name.Visible = false end
         
         if getgenv().LunarState.HealthBars then
             local hpPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-            obj.HealthBarBg.Size = Vector2.new(3, height); obj.HealthBarBg.Position = Vector2.new(topLeftX-6, topLeftY); obj.HealthBarBg.Visible = true
-            obj.HealthBar.Size = Vector2.new(3, height*hpPercent); obj.HealthBar.Position = Vector2.new(topLeftX-6, topLeftY+(height*(1-hpPercent))); obj.HealthBar.Visible = true
-        else obj.HealthBarBg.Visible = false; obj.HealthBar.Visible = false end
+            obj.HealthBg.Size = Vector2.new(4, height); obj.HealthBg.Position = Vector2.new(topLeftX-7, topLeftY); obj.HealthBg.Visible = true
+            obj.HealthBar.Size = Vector2.new(4, height*hpPercent); obj.HealthBar.Position = Vector2.new(topLeftX-7, topLeftY+(height*(1-hpPercent))); obj.HealthBar.Visible = true
+        else obj.HealthBg.Visible = false; obj.HealthBar.Visible = false end
         
         if getgenv().LunarState.Skeleton then
             local rigType = (hum.RigType == Enum.HumanoidRigType.R15) and "R15" or "R6"
@@ -301,513 +257,363 @@ local function createEsp(player)
                     local partA = char:FindFirstChild(pairsList[i][1]); local partB = char:FindFirstChild(pairsList[i][2])
                     if partA and partB then
                         local posA, visA = Camera:WorldToViewportPoint(partA.Position); local posB, visB = Camera:WorldToViewportPoint(partB.Position)
-                        if visA and visB and posA.Z>0 and posB.Z>0 then line.From=Vector2.new(posA.X,posA.Y); line.To=Vector2.new(posB.X,posB.Y); line.Color=color; line.Visible=true
+                        if visA and visB and posA.Z>0 and posB.Z>0 then 
+                            line.From=Vector2.new(posA.X,posA.Y); line.To=Vector2.new(posB.X,posB.Y); 
+                            line.Color=color; line.Visible=true
                         else line.Visible = false end
                     else line.Visible = false end
                 else line.Visible = false end
             end
         else for _,l in ipairs(obj.Skeletons) do l.Visible=false end end
+
+        if getgenv().LunarState.OffscreenArrows and not onScreen then
+            local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+            local angle = math.atan2(rootPos.Y - center.Y, rootPos.X - center.X)
+            local radius = math.min(Camera.ViewportSize.X, Camera.ViewportSize.Y) / 2 - 30
+            local arrowPos = center + Vector2.new(math.cos(angle), math.sin(angle)) * radius
+            
+            obj.Arrow.PointA = arrowPos
+            obj.Arrow.PointB = arrowPos + Vector2.new(math.cos(angle + 2.5), math.sin(angle + 2.5)) * 15
+            obj.Arrow.PointC = arrowPos + Vector2.new(math.cos(angle - 2.5), math.sin(angle - 2.5)) * 15
+            obj.Arrow.Visible = true
+        else obj.Arrow.Visible = false end
+
+    elseif hasDrawing then
+        HideESPObject(player)
     end
 end
 
--- DROPKICK FLING LOGIC (Fixed Flickering)
-local dropkickAnim = Instance.new("Animation")
-dropkickAnim.AnimationId = "rbxassetid://133566007754001"
-local dropkickTrack, dropkickConn, dropkickNoclipConn, dropkickVelConn = nil, nil, nil, nil
-
-local function startDropkick(char)
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum or hum.RigType ~= Enum.HumanoidRigType.R15 then return end
-    
-    local animator = hum:FindFirstChildOfClass("Animator")
-    if not animator then return end
-    
-    pcall(function()
-        dropkickTrack = animator:LoadAnimation(dropkickAnim)
-        dropkickConn = Mouse.Button1Down:Connect(function()
-            if not getgenv().LunarState.Dropkick or not dropkickTrack then return end
-            pcall(function()
-                dropkickTrack:Play()
-                local root = char:FindFirstChild("HumanoidRootPart")
-                if not root then return end
-                
-                local bv = Instance.new("BodyVelocity")
-                bv.Name = "DropkickFling"
-                bv.Velocity = Vector3.new(0, 500, 0)
-                bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-                bv.Parent = root
-                
-                dropkickVelConn = RunService.Heartbeat:Connect(function()
-                    if not getgenv().LunarState.Dropkick or not char or not root then 
-                        if bv then bv:Destroy() end
-                        return 
-                    end
-                    bv.Velocity = Vector3.new(0, 500 + math.random(-50, 50), 0)
-                end)
-                
-                dropkickTrack.Stopped:Wait()
-                if bv then bv:Destroy() end
-                if dropkickVelConn then dropkickVelConn:Disconnect(); dropkickVelConn = nil end
-            end)
-        end)
-        
-        dropkickNoclipConn = RunService.Stepped:Connect(function()
-            if not getgenv().LunarState.Dropkick or not char then return end
-            for _, child in pairs(char:GetDescendants()) do
-                if child:IsA("BasePart") then child.CanCollide = false end
-            end
-        end)
-    end)
-end
-
-if LocalPlayer.Character then startDropkick(LocalPlayer.Character) end
-LocalPlayer.CharacterAdded:Connect(startDropkick)
-
--- CUSTOMIZABLE ANTI-AIM LOGIC
-local aaConn, aaBindConn = nil, nil
-local function updateAntiAim()
-    if aaConn then aaConn:Disconnect(); aaConn = nil end
-    if aaBindConn then RunService:UnbindFromRenderStep("LunarAA"); aaBindConn = nil end
-    
-    if not isFeatureActive("AntiAim") then return end
-    
-    aaConn = RunService.Heartbeat:Connect(function()
-        local char = LocalPlayer.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart
-        if not hrp then return end
-        
-        local oldCf = hrp.CFrame
-        local oldVel = hrp.Velocity
-        local oldRotVel = hrp.RotVelocity
-        local randomness = CFrame.new(Vector3.new(
-            math.random(1, getgenv().LunarState.Config.AntiAimX),
-            math.random(1, getgenv().LunarState.Config.AntiAimY),
-            math.random(1, getgenv().LunarState.Config.AntiAimZ)
-        ))
-        
-        hrp.CFrame = hrp.CFrame * randomness
-        
-        aaBindConn = RunService:BindToRenderStep("LunarAA", 101, function(delta)
-            hrp.CFrame = oldCf
-            hrp.Velocity = oldVel
-            hrp.RotVelocity = oldRotVel
-            RunService:UnbindFromRenderStep("LunarAA")
-            aaBindConn = nil
-        end)
-    end)
-end
-
--- IMAGE CRASHER LOGIC
-local function getImageId(url)
-    local success, response = pcall(function()
-        return request({ Url = url, Method = "GET" })
-    end)
-    if not success or not response.Success then return "" end
-    
-    local pngName = math.random(1, 100000) .. ".png"
-    writefile(pngName, response.Body)
-    if not isfile(pngName) then return "" end
-    
-    local assetId = getcustomasset(pngName)
-    delfile(pngName)
-    return assetId or ""
-end
-
-local imageCrashGui, imageCrashLabel = nil, nil
-local crashImages = {
-    "https://preview.redd.it/i-asked-an-ai-what-would-ksi-look-like-if-he-had-a-very-big-v0-f9p6hu5r52ja1.png?width=1024&format=png&auto=webp&s=a0928c942e12a35e2ba416d647134f611bf3b6ff",
-    "https://cdn.discordapp.com/attachments/1538962732152524821/1548700564672479262/image.png?ex=6aa8034c&is=6aa6b1cc&hm=f64960b6679a3fb1fc740886dc7e64b6e8ac79fd17552a8450953e769f7c632b&",
-    "https://www.drwindows.de/news/wp-content/uploads/2023/08/bluescreen_unsupported_processor.jpg",
-    "https://cdn.discordapp.com/attachments/1544282663521878066/1548705137814536252/LXNjcmVlbi5wbmc.png?ex=6aa8078e&is=6aa6b60e&hm=447fc5185b8c6168221d9628a6279ec84df0284a9f7e7e2b897a40432443a181&"
-}
-
-local function triggerImageCrash()
-    if imageCrashGui then imageCrashGui:Destroy() end
-    
-    -- Select random image from table
-    local selectedUrl = crashImages[math.random(#crashImages)]
-    local imgId = getImageId(selectedUrl)
-    
-    if not tostring(imgId):find("rbxasset") then return end
-    
-    imageCrashGui = Instance.new("ScreenGui")
-    imageCrashGui.IgnoreGuiInset = true
-    imageCrashGui.ResetOnSpawn = false
-    imageCrashGui.Parent = gethui()
-    
-    imageCrashLabel = Instance.new("ImageLabel")
-    imageCrashLabel.Parent = imageCrashGui
-    imageCrashLabel.Size = UDim2.new(1, 0, 1, 0)
-    imageCrashLabel.Position = UDim2.new(0, 0, 0, 0)
-    imageCrashLabel.Visible = true
-    imageCrashLabel.Transparency = 0.999999
-    imageCrashLabel.Image = imgId
-    
-    repeat task.wait() until imageCrashLabel.IsLoaded ~= ""
-    imageCrashLabel.Transparency = 0
-    
-    task.wait(0.1)
-    local robloxGui = CoreGui:FindFirstChild('RobloxGui')
-    if robloxGui then robloxGui.Enabled = false end
-    
-    game:GetService("ScriptContext"):SetTimeout(9999999999)
-    RunService.RenderStepped:Connect(function()
-        task.spawn(function() while true do end end)
-    end)
-end
-
--- FLING SYSTEM
-local AllBool = false
-local function GetMessage(_Title, _Text, Time)
-    pcall(function() StarterGui:SetCore("SendNotification", {Title = _Title, Text = _Text, Duration = Time}) end)
-end
-
-local function GetPlayer(Name)
-    Name = Name:lower()
-    if Name == "all" or Name == "others" then
-        AllBool = true
-        return
-    elseif Name == "random" then
-        local GetPlayers = Players:GetPlayers()
-        if table.find(GetPlayers, LocalPlayer) then table.remove(GetPlayers, table.find(GetPlayers, LocalPlayer)) end
-        return GetPlayers[math.random(#GetPlayers)]
-    elseif Name ~= "random" and Name ~= "all" and Name ~= "others" then
-        for _, x in next, Players:GetPlayers() do
-            if x ~= LocalPlayer then
-                if x.Name:lower():match("^"..Name) then return x
-                elseif x.DisplayName:lower():match("^"..Name) then return x end
-            end
-        end
-    end
-end
-
-local function FlingTarget(TargetPlayer)
-    if not TargetPlayer or not TargetPlayer.Character then
-        return GetMessage("Error", "Target has no character", 3)
-    end
-    
-    local Character = LocalPlayer.Character
-    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-    local RootPart = Humanoid and Humanoid.RootPart
-
-    local TCharacter = TargetPlayer.Character
-    if not TCharacter then return end
-    
-    local THumanoid = TCharacter:FindFirstChildOfClass("Humanoid")
-    if not THumanoid then return end
-    
-    local TRootPart = THumanoid.RootPart
-    local THead = TCharacter:FindFirstChild("Head")
-    local Accessory = TCharacter:FindFirstChildOfClass("Accessory")
-    local Handle = Accessory and Accessory:FindFirstChild("Handle")
-
-    if not (Character and Humanoid and RootPart) then
-        return GetMessage("Error", "Local player missing components", 3)
-    end
-
-    if RootPart.Velocity.Magnitude < 50 then getgenv().OldPos = RootPart.CFrame end
-    if THumanoid.Sit and not AllBool then
-        return GetMessage("Error Occurred", "Target is sitting", 5)
-    end
-    
-    if THead then Camera.CameraSubject = THead
-    elseif Handle then Camera.CameraSubject = Handle
-    elseif THumanoid then Camera.CameraSubject = THumanoid end
-    
-    if not TCharacter:FindFirstChildWhichIsA("BasePart") then return end
-    
-    local FPos = function(BasePart, Pos, Ang)
-        if not RootPart or not Character then return end
-        RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
-        Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
-        RootPart.Velocity = Vector3.new(9e7, 9e8, 9e7)
-        RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
-    end
-    
-    local SFBasePart = function(BasePart)
-        if not BasePart or not THumanoid or not RootPart then return end
-        local TimeToWait = 2
-        local Time = tick()
-        local Angle = 0
-
-        repeat
-            if RootPart and THumanoid and BasePart.Parent == TCharacter then
-                if BasePart.Velocity.Magnitude < 50 then
-                    Angle = Angle + 100
-                    FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0)); task.wait()
-                    FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(2.25, 1.5, -2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(-2.25, -1.5, 2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection,CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection,CFrame.Angles(math.rad(Angle), 0, 0)); task.wait()
-                else
-                    FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0, 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(0, 1.5, TRootPart and TRootPart.Velocity.Magnitude / 1.25 or 0), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(0, -1.5, -(TRootPart and TRootPart.Velocity.Magnitude / 1.25 or 0)), CFrame.Angles(0, 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(0, 1.5, TRootPart and TRootPart.Velocity.Magnitude / 1.25 or 0), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(0, -1.5 ,0), CFrame.Angles(math.rad(-90), 0, 0)); task.wait()
-                    FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0)); task.wait()
+local function UpdateChams()
+    if getgenv().LunarState.Chams or getgenv().LunarState.Glow then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character then
+                if getgenv().LunarState.Chams and not plr.Character:FindFirstChild("LunarChams") then
+                    local h = Instance.new("Highlight")
+                    h.Name = "LunarChams"
+                    h.FillColor = getgenv().LunarState.Config.Visuals.BoxColor
+                    h.FillTransparency = 0.5
+                    h.OutlineColor = Color3.fromRGB(0,0,0)
+                    h.Parent = plr.Character
                 end
-            else break end
-        until not BasePart or not BasePart.Parent or BasePart.Parent ~= TCharacter or TargetPlayer.Parent ~= Players or not TargetPlayer.Character or TargetPlayer.Character ~= TCharacter or (THumanoid and THumanoid.Sit) or (Humanoid and Humanoid.Health <= 0) or tick() > Time + TimeToWait
-    end
-    
-    workspace.FallenPartsDestroyHeight = 0/0
-    
-    local BV = Instance.new("BodyVelocity")
-    BV.Name = "EpixVel"; BV.Parent = RootPart
-    BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
-    BV.MaxForce = Vector3.new(1/0, 1/0, 1/0)
-    
-    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-    
-    if TRootPart and THead then
-        if (TRootPart.CFrame.p - THead.CFrame.p).Magnitude > 5 then SFBasePart(THead) else SFBasePart(TRootPart) end
-    elseif TRootPart then SFBasePart(TRootPart)
-    elseif THead then SFBasePart(THead)
-    elseif Handle then SFBasePart(Handle)
-    else 
-        BV:Destroy()
-        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-        return GetMessage("Error Occurred", "Target is missing everything", 5) 
-    end
-    
-    BV:Destroy()
-    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-    Camera.CameraSubject = Humanoid
-    
-    if getgenv().OldPos then
-        repeat
-            if not RootPart or not Character then break end
-            RootPart.CFrame = getgenv().OldPos * CFrame.new(0, .5, 0)
-            Character:SetPrimaryPartCFrame(getgenv().OldPos * CFrame.new(0, .5, 0))
-            Humanoid:ChangeState("GettingUp")
-            for _, x in pairs(Character:GetChildren()) do
-                if x:IsA("BasePart") then x.Velocity, x.RotVelocity = Vector3.new(), Vector3.new() end
+                if getgenv().LunarState.Glow and not plr.Character:FindFirstChild("LunarGlow") then
+                    local g = Instance.new("Highlight")
+                    g.Name = "LunarGlow"
+                    g.FillColor = getgenv().LunarState.Config.Visuals.BoxColor
+                    g.FillTransparency = 0.8
+                    g.OutlineTransparency = 1
+                    g.Parent = plr.Character
+                end
             end
-            task.wait()
-        until not RootPart or not getgenv().OldPos or (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
-    end
-    workspace.FallenPartsDestroyHeight = getgenv().FPDH or -500
-end
-
-local function executeFling(targets)
-    AllBool = false
-    if not targets or #targets == 0 then return GetMessage("Error", "No targets specified", 3) end
-    
-    for _, x in next, targets do GetPlayer(x) end
-    
-    if AllBool then
-        for _, x in next, Players:GetPlayers() do
-            if x ~= LocalPlayer then FlingTarget(x) end
         end
-        return
-    end
-    
-    for _, x in next, targets do
-        local TPlayer = GetPlayer(x)
-        if TPlayer and TPlayer ~= LocalPlayer then
-            FlingTarget(TPlayer)
-        elseif not TPlayer and not AllBool then
-            GetMessage("Error Occurred", "Username Invalid: "..x, 5)
+    else
+        for _, plr in ipairs(Players:GetPlayers()) do 
+            if plr.Character then 
+                local c = plr.Character:FindFirstChild("LunarChams"); if c then c:Destroy() end
+                local g = plr.Character:FindFirstChild("LunarGlow"); if g then g:Destroy() end
+            end 
         end
     end
 end
 
--- ANTI-FLING PROTECTION
-local antiFlingConn = nil
-local originalCFrames = {}
-
-local function enableAntiFling()
-    if antiFlingConn then return end
+-- COMBAT TAB
+do
+    local LeftGroup = Tabs.Combat:AddLeftGroupbox("Aimbot & Trigger")
     
-    antiFlingConn = RunService.Heartbeat:Connect(function()
-        local char = LocalPlayer.Character
-        if not char then return end
-        
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        
-        local currentVel = hrp.Velocity
-        local magnitude = currentVel.Magnitude
-        
-        -- Detect abnormal velocity spikes indicative of flinging
-        if magnitude > 1000 then
-            -- Store original CFrame if not already stored
-            if not originalCFrames[char] then
-                originalCFrames[char] = hrp.CFrame
+    LeftGroup:AddToggle("AimbotEnabled", {
+        Text = "Enable Aimbot",
+        Default = false,
+        Callback = function(Value)
+            getgenv().LunarState.Aimbot = Value
+            if fovCircle then fovCircle.Visible = Value end
+        end,
+    }):AddKeyPicker("AimbotKey", {
+        Default = "None", SyncToggleState = false, Mode = "Hold", 
+        Text = "Aimbot Key", NoUI = true
+    })
+
+    LeftGroup:AddSlider("AimFOV", {
+        Text = "FOV Radius", Min = 10, Max = 500, Default = 150, Rounding = 0,
+        Callback = function(Value)
+            getgenv().LunarState.Config.AimFOV = Value
+            if fovCircle then fovCircle.Radius = Value end
+        end
+    })
+
+    LeftGroup:AddSlider("AimSmooth", {
+        Text = "Smoothness", Min = 0, Max = 1, Default = 0.2, Rounding = 2,
+        Callback = function(Value) getgenv().LunarState.Config.AimSmooth = Value end
+    })
+
+    LeftGroup:AddDropdown("HitPart", {
+        Text = "Target Part", Values = {"Head","HumanoidRootPart","UpperTorso","Torso"}, 
+        Multi = false, Default = "Head",
+        Callback = function(Value) getgenv().LunarState.Config.HitPart = Value end
+    })
+
+    LeftGroup:AddDivider()
+
+    LeftGroup:AddToggle("TriggerEnabled", {
+        Text = "Enable Triggerbot", Default = false,
+        Callback = function(Value) getgenv().LunarState.Trigger = Value end
+    }):AddKeyPicker("TriggerKey", {
+        Default = "None", SyncToggleState = false, Mode = "Hold", 
+        Text = "Trigger Key", NoUI = true
+    })
+
+    LeftGroup:AddSlider("TriggerDelay", {
+        Text = "Shot Delay", Min = 0, Max = 0.5, Default = 0.025, Rounding = 3,
+        Callback = function(Value) getgenv().LunarState.Config.TriggerDelay = Value end
+    })
+
+    LeftGroup:AddToggle("SilentAim", {
+        Text = "Silent Aim", Default = false,
+        Callback = function(Value) getgenv().LunarState.SilentAim = Value end
+    })
+
+    LeftGroup:AddToggle("KillAura", {
+        Text = "Kill Aura", Default = false,
+        Callback = function(Value) getgenv().LunarState.KillAura = Value end
+    })
+
+    LeftGroup:AddSlider("ReachDist", {
+        Text = "Reach Distance", Min = 1, Max = 20, Default = 5, Rounding = 0,
+        Callback = function(Value) getgenv().LunarState.Config.ReachDist = Value end
+    })
+end
+
+-- VISUALS TAB
+do
+    local LeftGroup = Tabs.Visuals:AddLeftGroupbox("ESP Features")
+    
+    LeftGroup:AddToggle("ESPEnabled", {
+        Text = "Master ESP Toggle", Default = false,
+        Callback = function(Value) getgenv().LunarState.ESP = Value end
+    })
+
+    LeftGroup:AddToggle("BoxESP", {
+        Text = "Box ESP", Default = true,
+        Callback = function(Value) getgenv().LunarState.BoxESP = Value end
+    })
+
+    LeftGroup:AddDropdown("EspStyle", {
+        Text = "Box Style", Values = {"Full Box","Corner Box"}, 
+        Multi = false, Default = "Full Box",
+        Callback = function(Value) getgenv().LunarState.Config.Visuals.EspStyle = Value end
+    })
+
+    LeftGroup:AddToggle("Tracers", {
+        Text = "Tracers", Default = false,
+        Callback = function(Value) getgenv().LunarState.Tracers = Value end
+    })
+
+    LeftGroup:AddToggle("Names", {
+        Text = "Player Names", Default = true,
+        Callback = function(Value) getgenv().LunarState.Names = Value end
+    })
+
+    LeftGroup:AddToggle("Distance", {
+        Text = "Distance", Default = false,
+        Callback = function(Value) getgenv().LunarState.Distance = Value end
+    })
+
+    LeftGroup:AddToggle("HealthBars", {
+        Text = "Health Bars", Default = true,
+        Callback = function(Value) getgenv().LunarState.HealthBars = Value end
+    })
+
+    LeftGroup:AddToggle("Skeleton", {
+        Text = "Skeleton ESP", Default = false,
+        Callback = function(Value) getgenv().LunarState.Skeleton = Value end
+    })
+
+    LeftGroup:AddToggle("OffscreenArrows", {
+        Text = "Offscreen Arrows", Default = false,
+        Callback = function(Value) getgenv().LunarState.OffscreenArrows = Value end
+    })
+
+    LeftGroup:AddDivider()
+
+    LeftGroup:AddToggle("Chams", {
+        Text = "Chams", Default = false,
+        Callback = function(Value) getgenv().LunarState.Chams = Value end
+    })
+
+    LeftGroup:AddToggle("Glow", {
+        Text = "Glow Effect", Default = false,
+        Callback = function(Value) getgenv().LunarState.Glow = Value end
+    })
+
+    local RightGroup = Tabs.Visuals:AddRightGroupbox("Colors & Thickness")
+    
+    RightGroup:AddLabel("Box Color"):AddColorPicker("BoxColor", {
+        Default = Color3.fromRGB(255, 60, 60), Transparency = 0,
+        Callback = function(Value) getgenv().LunarState.Config.Visuals.BoxColor = Value end
+    })
+
+    RightGroup:AddLabel("Tracer Color"):AddColorPicker("TracerColor", {
+        Default = Color3.fromRGB(255, 255, 255), Transparency = 0,
+        Callback = function(Value) getgenv().LunarState.Config.Visuals.TracerColor = Value end
+    })
+
+    RightGroup:AddLabel("Name Color"):AddColorPicker("NameColor", {
+        Default = Color3.fromRGB(255, 255, 255), Transparency = 0,
+        Callback = function(Value) getgenv().LunarState.Config.Visuals.NameColor = Value end
+    })
+
+    RightGroup:AddLabel("Health Color"):AddColorPicker("HealthColor", {
+        Default = Color3.fromRGB(40, 220, 90), Transparency = 0,
+        Callback = function(Value) getgenv().LunarState.Config.Visuals.HealthColor = Value end
+    })
+
+    RightGroup:AddDivider()
+
+    RightGroup:AddSlider("BoxThickness", {
+        Text = "Box Thickness", Min = 1, Max = 5, Default = 1, Rounding = 0,
+        Callback = function(Value) 
+            getgenv().LunarState.Config.Visuals.BoxThickness = Value
+            for _, obj in pairs(getgenv().LunarState.ESPObjects) do
+                for _, l in ipairs(obj.BoxLines) do l.Thickness = Value end
             end
-            
-            -- Reset position and velocity to prevent fling
-            hrp.CFrame = originalCFrames[char]
-            hrp.Velocity = Vector3.new(0, 0, 0)
-            hrp.RotVelocity = Vector3.new(0, 0, 0)
-            
-            -- Clear stored CFrame after stabilization
-            task.delay(0.5, function()
-                originalCFrames[char] = nil
-            end)
-        else
-            -- Update stored CFrame when velocity is normal
-            originalCFrames[char] = hrp.CFrame
         end
-    end)
+    })
+
+    RightGroup:AddSlider("TracerThickness", {
+        Text = "Tracer Thickness", Min = 1, Max = 5, Default = 2, Rounding = 0,
+        Callback = function(Value) 
+            getgenv().LunarState.Config.Visuals.TracerThickness = Value
+            for _, obj in pairs(getgenv().LunarState.ESPObjects) do
+                obj.Tracer.Thickness = Value
+            end
+        end
+    })
+
+    RightGroup:AddSlider("FontSize", {
+        Text = "Font Size", Min = 10, Max = 24, Default = 13, Rounding = 0,
+        Callback = function(Value) 
+            getgenv().LunarState.Config.Visuals.FontSize = Value
+            for _, obj in pairs(getgenv().LunarState.ESPObjects) do
+                obj.Name.Size = Value
+            end
+        end
+    })
+
+    RightGroup:AddSlider("MaxDistance", {
+        Text = "Max Render Dist", Min = 100, Max = 5000, Default = 1000, Rounding = 0,
+        Callback = function(Value) getgenv().LunarState.Config.Visuals.MaxDistance = Value end
+    })
 end
 
-local function disableAntiFling()
-    if antiFlingConn then
-        antiFlingConn:Disconnect()
-        antiFlingConn = nil
-    end
-    originalCFrames = {}
+-- MISC TAB
+do
+    local LeftGroup = Tabs.Misc:AddLeftGroupbox("Movement & Physics")
+    
+    LeftGroup:AddToggle("FlyEnabled", {
+        Text = "Fly Mode", Default = false,
+        Callback = function(Value) getgenv().LunarState.Fly = Value end
+    }):AddKeyPicker("FlyKey", {
+        Default = "None", SyncToggleState = false, Mode = "Hold", 
+        Text = "Fly Key", NoUI = true
+    })
+
+    LeftGroup:AddSlider("FlySpeed", {
+        Text = "Fly Speed", Min = 10, Max = 300, Default = 50, Rounding = 0,
+        Callback = function(Value) getgenv().LunarState.Config.FlySpeed = Value end
+    })
+
+    LeftGroup:AddToggle("SpeedEnabled", {
+        Text = "Walk Speed", Default = false,
+        Callback = function(Value) getgenv().LunarState.Speed = Value end
+    }):AddKeyPicker("SpeedKey", {
+        Default = "None", SyncToggleState = false, Mode = "Hold", 
+        Text = "Speed Key", NoUI = true
+    })
+
+    LeftGroup:AddSlider("WalkSpeed", {
+        Text = "Speed Value", Min = 16, Max = 300, Default = 16, Rounding = 0,
+        Callback = function(Value) getgenv().LunarState.Config.WalkSpeed = Value end
+    })
+
+    LeftGroup:AddToggle("InfJump", {
+        Text = "Infinite Jump", Default = false,
+        Callback = function(Value) getgenv().LunarState.InfJump = Value end
+    })
+
+    LeftGroup:AddToggle("NoclipEnabled", {
+        Text = "Noclip", Default = false,
+        Callback = function(Value) getgenv().LunarState.Noclip = Value end
+    }):AddKeyPicker("NoclipKey", {
+        Default = "None", SyncToggleState = false, Mode = "Hold", 
+        Text = "Noclip Key", NoUI = true
+    })
+
+    LeftGroup:AddSlider("Gravity", {
+        Text = "Gravity", Min = 0, Max = 196, Default = 196, Rounding = 0,
+        Callback = function(Value) getgenv().LunarState.Config.Gravity = Value end
+    })
+
+    LeftGroup:AddToggle("NoFallDamage", {
+        Text = "No Fall Damage", Default = false,
+        Callback = function(Value) getgenv().LunarState.NoFallDamage = Value end
+    })
+
+    local RightGroup = Tabs.Misc:AddRightGroupbox("Protection & Extra")
+    
+    RightGroup:AddToggle("AntiFling", {
+        Text = "Anti-Fling Protection", Default = false,
+        Callback = function(Value) getgenv().LunarState.AntiFling = Value end
+    })
+
+    RightGroup:AddToggle("SpinBot", {
+        Text = "Spin Bot", Default = false,
+        Callback = function(Value) getgenv().LunarState.SpinBot = Value end
+    })
+
+    RightGroup:AddToggle("AutoFarm", {
+        Text = "Auto Farm", Default = false,
+        Callback = function(Value) getgenv().LunarState.AutoFarm = Value end
+    })
 end
 
-print("[Lunar] Creating UI Tabs...")
-local CombatTab = Window:AddTab("Combat"); local VisualsTab = Window:AddTab("Visuals")
-local MiscTab = Window:AddTab("Misc"); local SettingsTab = Window:AddTab("Settings")
+-- SETTINGS TAB
+do
+    local LeftGroup = Tabs.Settings:AddLeftGroupbox("Menu Settings")
+    
+    LeftGroup:AddLabel("Menu Keybind")
+        :AddKeyPicker("MenuKeybind", { 
+            Default = "RightShift", NoUI = true, Text = "Menu keybind" 
+        })
 
-print("[Lunar] Building Combat Section...")
-local CombatGroup = CombatTab:AddLeftGroupbox("Aimbot & Trigger")
-local aimbotToggle = CombatGroup:AddToggle("AimbotEnabled", { Text="Enable Aimbot", Callback=function(s) getgenv().LunarState.Aimbot=s; if fovCircle then fovCircle.Visible=s end end })
-aimbotToggle:AddKeyPicker("AimbotKey", { Default="None", SyncToggleState=false, Mode="Hold", Text="Aimbot Key", NoUI=true, ChangedCallback=function(new) getgenv().LunarState.Config.Keys.Aimbot=new end })
-CombatGroup:AddSlider("AimFOV", { Text="FOV Radius", Min=10, Max=500, Default=150, Rounding=0, Callback=function(v) getgenv().LunarState.Config.AimFOV=v; if fovCircle then fovCircle.Radius=v end end })
-CombatGroup:AddSlider("AimSmooth", { Text="Smoothness", Min=0, Max=1, Default=0.2, Rounding=2, Callback=function(v) getgenv().LunarState.Config.AimSmoothness=v end })
-CombatGroup:AddDropdown("HitPart", { Text="Target Part", Values={"Head","HumanoidRootPart","UpperTorso","Torso"}, Multi=false, Default="Head", Callback=function(v) getgenv().LunarState.Config.HitPart=v end })
+    SaveManager:BuildConfigSection(Tabs.Settings)
+    ThemeManager:ApplyToTab(Tabs.Settings)
 
-local triggerToggle = CombatGroup:AddToggle("TriggerEnabled", { Text="Enable Triggerbot", Callback=function(s) getgenv().LunarState.Trigger=s end })
-triggerToggle:AddKeyPicker("TriggerKey", { Default="None", SyncToggleState=false, Mode="Hold", Text="Trigger Key", NoUI=true, ChangedCallback=function(new) getgenv().LunarState.Config.Keys.Trigger=new end })
-CombatGroup:AddSlider("TriggerDelay", { Text="Shot Delay", Min=0, Max=0.5, Default=0.025, Rounding=3, Callback=function(v) getgenv().LunarState.Config.TriggerDelay=v end })
-CombatGroup:AddToggle("SilentAim", { Text="Silent Aim", Callback=function(s) getgenv().LunarState.SilentAim=s end })
-CombatGroup:AddToggle("KillAura", { Text="Kill Aura", Callback=function(s) getgenv().LunarState.KillAura=s end })
-CombatGroup:AddSlider("Reach", { Text="Reach Distance", Min=1, Max=20, Default=5, Rounding=0, Callback=function(v) getgenv().LunarState.Config.ReachDist=v end })
+    LeftGroup:AddDivider()
 
-print("[Lunar] Building Visuals Section...")
-local VisualsGroup = VisualsTab:AddLeftGroupbox("ESP Features")
-VisualsGroup:AddToggle("ESPEnabled", { Text="Enable ESP Boxes", Callback=function(s) getgenv().LunarState.ESP=s end })
-VisualsGroup:AddDropdown("EspStyle", { Text="Box Style", Values={"Full Box","Corner Box"}, Multi=false, Default="Full Box", Callback=function(v) getgenv().LunarState.Config.Visuals.EspStyle=v end })
-VisualsGroup:AddToggle("TracerEnabled", { Text="Tracers", Callback=function(s) getgenv().LunarState.Tracers=s end })
-VisualsGroup:AddToggle("ChamsEnabled", { Text="Chams", Callback=function(s) getgenv().LunarState.Chams=s end })
-VisualsGroup:AddToggle("SkeletonEnabled", { Text="Skeleton", Callback=function(s) getgenv().LunarState.Skeleton=s end })
-VisualsGroup:AddToggle("NamesEnabled", { Text="Player Names", Callback=function(s) getgenv().LunarState.Names=s end })
-VisualsGroup:AddToggle("DistanceEnabled", { Text="Distance", Callback=function(s) getgenv().LunarState.Distance=s end })
-VisualsGroup:AddToggle("HealthBarsEnabled", { Text="Health Bars", Callback=function(s) getgenv().LunarState.HealthBars=s end })
+    LeftGroup:AddButton({
+        Text = "Unload Script",
+        Func = function()
+            getgenv().LunarRunning = false
+            for _,l in pairs(getgenv().LunarState.Lines) do pcall(function() l:Remove() end) end
+            if fovCircle then pcall(function() fovCircle:Remove() end) end
+            for _, obj in pairs(getgenv().LunarState.ESPObjects) do RemoveESPObject(obj) end
+            Library:Unload() 
+        end,
+    })
+end
 
-local TracerGroup = VisualsTab:AddRightGroupbox("Colors & Thickness")
-TracerGroup:AddSlider("TracerThickness", { Text="Tracer Thickness", Min=1, Max=5, Default=2, Rounding=0, Callback=function(v) getgenv().LunarState.Config.Visuals.TracerThickness=v end })
-
-print("[Lunar] Building Misc Section...")
-local MiscGroup = MiscTab:AddLeftGroupbox("Movement & Physics")
-local flyToggle = MiscGroup:AddToggle("FlyEnabled", { Text="Fly Mode", Callback=function(s) getgenv().LunarState.Fly=s end })
-flyToggle:AddKeyPicker("FlyKey", { Default="None", SyncToggleState=false, Mode="Hold", Text="Fly Key", NoUI=true, ChangedCallback=function(new) getgenv().LunarState.Config.Keys.Fly=new end })
-MiscGroup:AddSlider("FlySpeed", { Text="Fly Speed", Min=10, Max=300, Default=50, Rounding=0, Callback=function(v) getgenv().LunarState.Config.FlySpeed=v end })
-
-local speedToggle = MiscGroup:AddToggle("SpeedEnabled", { Text="Walk Speed", Callback=function(s) getgenv().LunarState.Speed=s end })
-speedToggle:AddKeyPicker("SpeedKey", { Default="None", SyncToggleState=false, Mode="Hold", Text="Speed Key", NoUI=true, ChangedCallback=function(new) getgenv().LunarState.Config.Keys.Speed=new end })
-MiscGroup:AddSlider("WalkSpeed", { Text="Speed Value", Min=16, Max=300, Default=16, Rounding=0, Callback=function(v) getgenv().LunarState.Config.WalkSpeed=v end })
-
-MiscGroup:AddToggle("JumpPowerEnabled", { Text="Custom Jump Power", Callback=function(s) getgenv().LunarState.JumpPower=s end })
-MiscGroup:AddSlider("JumpPower", { Text="Jump Power Value", Min=50, Max=350, Default=50, Rounding=0, Callback=function(v) getgenv().LunarState.Config.JumpPowerVal=v end })
-MiscGroup:AddSlider("Gravity", { Text="Gravity", Min=0, Max=196, Default=196, Rounding=0, Callback=function(v) getgenv().LunarState.Config.Gravity=v end })
-MiscGroup:AddToggle("InfJump", { Text="Infinite Jump", Callback=function(s) getgenv().LunarState.InfJump=s end })
-local noclipToggle = MiscGroup:AddToggle("NoclipEnabled", { Text="Noclip", Callback=function(s) getgenv().LunarState.Noclip=s end })
-noclipToggle:AddKeyPicker("NoclipKey", { Default="None", SyncToggleState=false, Mode="Hold", Text="Noclip Key", NoUI=true, ChangedCallback=function(new) getgenv().LunarState.Config.Keys.Noclip=new end })
-
-print("[Lunar] Building Extra Features Section...")
-local ExtraGroup = MiscTab:AddRightGroupbox("Extra Features")
-ExtraGroup:AddToggle("GodMode", { Text="God Mode", Callback=function(s) getgenv().LunarState.GodMode=s end })
-
-local aaToggle = ExtraGroup:AddToggle("AntiAimEnabled", { 
-    Text="Anti Aim (Customizable)", 
-    Callback=function(s) 
-        getgenv().LunarState.AntiAim = s 
-        updateAntiAim()
-    end 
-})
-aaToggle:AddKeyPicker("AntiAimKey", { Default="None", SyncToggleState=false, Mode="Hold", Text="Anti Aim Key", NoUI=true, ChangedCallback=function(new) getgenv().LunarState.Config.Keys.AntiAim=new end })
-ExtraGroup:AddSlider("AntiAimX", { Text="X Radius", Min=1, Max=100, Default=5, Rounding=0, Callback=function(v) getgenv().LunarState.Config.AntiAimX=v end })
-ExtraGroup:AddSlider("AntiAimY", { Text="Y Radius", Min=1, Max=100, Default=5, Rounding=0, Callback=function(v) getgenv().LunarState.Config.AntiAimY=v end })
-ExtraGroup:AddSlider("AntiAimZ", { Text="Z Radius", Min=1, Max=100, Default=5, Rounding=0, Callback=function(v) getgenv().LunarState.Config.AntiAimZ=v end })
-
-ExtraGroup:AddToggle("SpinBot", { Text="Spin Bot", Callback=function(s) getgenv().LunarState.SpinBot=s end })
-ExtraGroup:AddToggle("FastDrown", { Text="Fast Drown", Callback=function(s) getgenv().LunarState.FastDrown=s end })
-ExtraGroup:AddToggle("NoFallDamage", { Text="No Fall Damage", Callback=function(s) getgenv().LunarState.NoFallDamage=s end })
-ExtraGroup:AddToggle("AutoFarm", { Text="Auto Farm", Callback=function(s) getgenv().LunarState.AutoFarm=s end })
-ExtraGroup:AddToggle("ChatSpam", { Text="Chat Spam", Callback=function(s) getgenv().LunarState.ChatSpam=s end })
-ExtraGroup:AddToggle("FakeLag", { Text="Fake Lag", Callback=function(s) getgenv().LunarState.FakeLag=s end })
-
-local NewFeaturesGroup = MiscTab:AddRightGroupbox("New Features")
-NewFeaturesGroup:AddToggle("DropkickEnabled", { 
-    Text="Dropkick Fling (R15 Only)", 
-    Callback=function(s) 
-        getgenv().LunarState.Dropkick = s
-        if not s then
-            if dropkickConn then dropkickConn:Disconnect(); dropkickConn = nil end
-            if dropkickNoclipConn then dropkickNoclipConn:Disconnect(); dropkickNoclipConn = nil end
-            if dropkickVelConn then dropkickVelConn:Disconnect(); dropkickVelConn = nil end
-            if dropkickTrack then dropkickTrack:Stop() end
-        end
-    end 
-})
-NewFeaturesGroup:AddButton("Trigger Image Crash", function()
-    if not getgenv().LunarState.ImageCrash then
-        getgenv().LunarState.ImageCrash = true
-        triggerImageCrash()
-    end
-end)
-NewFeaturesGroup:AddButton("Fling All Players", function()
-    executeFling({"All"})
-end)
-NewFeaturesGroup:AddButton("Fling Random Player", function()
-    executeFling({"Random"})
-end)
-NewFeaturesGroup:AddToggle("AntiFlingEnabled", {
-    Text="Anti-Fling Protection",
-    Callback=function(s)
-        getgenv().LunarState.AntiFling = s
-        if s then
-            enableAntiFling()
-        else
-            disableAntiFling()
-        end
-    end
-})
-
-print("[Lunar] Building Settings Section...")
+-- SAVE/THEME MANAGER SETUP
+Library.ToggleKeybind = Options.MenuKeybind
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({"MenuKeybind"})
-ThemeManager:SetFolder("LunarUniversal")
-SaveManager:SetFolder("LunarUniversal")
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+SaveManager:SetFolder("Lunar_Script/universalv2")
+SaveManager:LoadAutoloadConfig()
 
-local ConfigGroup = SettingsTab:AddLeftGroupbox("Configuration")
-ConfigGroup:AddButton("Unload", function() 
-    getgenv().LunarRunning = false
-    for _,l in pairs(getgenv().LunarState.Lines) do l:Remove() end
-    if fovCircle then fovCircle:Remove() end
-    if MyUI then MyUI:Destroy() end
-    if dropkickConn then dropkickConn:Disconnect() end
-    if dropkickNoclipConn then dropkickNoclipConn:Disconnect() end
-    if dropkickVelConn then dropkickVelConn:Disconnect() end
-    if aaConn then aaConn:Disconnect() end
-    if imageCrashGui then imageCrashGui:Destroy() end
-    disableAntiFling()
-    Library:Unload() 
-end)
-
-ThemeManager:ApplyToTab(SettingsTab)
-SaveManager:BuildConfigSection(SettingsTab)
-
-print("[Lunar] Starting Runtime Loops...")
+-- MAIN RUNTIME LOOP
 local frameSkip = 0
 local flyBodyVel, flyBodyGyro, flyConn
-local noclipConn, infJumpConn, godConn, spinConn, drownConn, fallConn, farmConn, spamConn, lagConn
+local noclipConn, infJumpConn, fallConn, spinConn, antiFlingConn
+local originalCFrames = {}
 
 RunService.RenderStepped:Connect(function()
     if not getgenv().LunarRunning then return end
@@ -816,130 +622,223 @@ RunService.RenderStepped:Connect(function()
     
     if hasDrawing and fovCircle then
         local mLoc = UserInputService:GetMouseLocation()
-        fovCircle.Position = Vector2.new(mLoc.X, mLoc.Y); fovCircle.Radius = getgenv().LunarState.Config.AimFOV
+        fovCircle.Position = Vector2.new(mLoc.X, mLoc.Y)
+        fovCircle.Radius = getgenv().LunarState.Config.AimFOV
     end
 
     if Character then
         local hum = Character:FindFirstChildOfClass("Humanoid")
         if hum then
-            hum.WalkSpeed = isFeatureActive("Speed") and getgenv().LunarState.Config.WalkSpeed or 16
-            if getgenv().LunarState.JumpPower then hum.UseJumpPower=true; hum.JumpPower=getgenv().LunarState.Config.JumpPowerVal end
-        end
-        workspace.Gravity = getgenv().LunarState.Config.Gravity
-        
-        if isFeatureActive("Fly") then
-            local hrp = Character:FindFirstChild("HumanoidRootPart") or Character:FindFirstChild("Torso")
-            if hrp and not flyConn then
-                flyBodyVel = Instance.new("BodyVelocity"); flyBodyVel.MaxForce=Vector3.new(1,1,1)*1e6; flyBodyVel.Velocity=Vector3.zero; flyBodyVel.Parent=hrp
-                flyBodyGyro = Instance.new("BodyGyro"); flyBodyGyro.MaxTorque=Vector3.new(1,1,1)*1e6; flyBodyGyro.CFrame=hrp.CFrame; flyBodyGyro.Parent=hrp
-                flyConn = RunService.RenderStepped:Connect(function()
-                    if not isFeatureActive("Fly") or not hrp then return end
-                    local move = Vector3.zero
-                    if UserInputService:IsKeyDown(Enum.KeyCode.W) then move=move+Camera.CFrame.LookVector end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.S) then move=move-Camera.CFrame.LookVector end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.A) then move=move-Camera.CFrame.RightVector end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.D) then move=move+Camera.CFrame.RightVector end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move=move+Vector3.new(0,1,0) end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then move=move-Vector3.new(0,1,0) end
-                    flyBodyVel.Velocity = move * getgenv().LunarState.Config.FlySpeed; flyBodyGyro.CFrame = Camera.CFrame
-                end)
-            elseif not isFeatureActive("Fly") and flyConn then
-                flyConn:Disconnect(); if flyBodyVel then flyBodyVel:Destroy() end; if flyBodyGyro then flyBodyGyro:Destroy() end; flyConn=nil
+            if getgenv().LunarState.Speed then
+                hum.WalkSpeed = getgenv().LunarState.Config.WalkSpeed
+            else
+                hum.WalkSpeed = 16
             end
-        else if flyConn then flyConn:Disconnect(); if flyBodyVel then flyBodyVel:Destroy() end; if flyBodyGyro then flyBodyGyro:Destroy() end; flyConn=nil end end
-        
-        if getgenv().LunarState.Noclip then
-            if not noclipConn then noclipConn=RunService.Stepped:Connect(function() if Character then for _,p in ipairs(Character:GetChildren()) do if p:IsA("BasePart") then p.CanCollide=false end end end end) end
-        elseif noclipConn then noclipConn:Disconnect(); noclipConn=nil end
-        
-        if getgenv().LunarState.InfJump then
-            if not infJumpConn then infJumpConn=UserInputService.JumpRequest:Connect(function() local h=Character:FindFirstChildOfClass("Humanoid"); if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end end) end
-        elseif infJumpConn then infJumpConn:Disconnect(); infJumpConn=nil end
-        
-        if getgenv().LunarState.GodMode then
-            if not godConn then godConn=RunService.Heartbeat:Connect(function() if hum then hum.Health=hum.MaxHealth end end) end
-        elseif godConn then godConn:Disconnect(); godConn=nil end
-        
-        if getgenv().LunarState.SpinBot then
-            if not spinConn then
-                spinConn = RunService.RenderStepped:Connect(function()
-                    local hrp = Character:FindFirstChild("HumanoidRootPart")
-                    if hrp then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(tick()*500), 0) end
-                end)
-            end
-        elseif spinConn then spinConn:Disconnect(); spinConn=nil end
-        
-        if getgenv().LunarState.FastDrown then
-            if not drownConn then drownConn=RunService.Heartbeat:Connect(function() if hum then hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, false) end end) end
-        elseif drownConn then drownConn:Disconnect(); drownConn=nil end
-        
-        if getgenv().LunarState.NoFallDamage then
-            if not fallConn then fallConn=hum.StateChanged:Connect(function(old, new) if new==Enum.HumanoidStateType.Freefall then hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false) end end) end
-        elseif fallConn then fallConn:Disconnect(); fallConn=nil end
-        
-        if getgenv().LunarState.Chams then
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr~=LocalPlayer and plr.Character and not plr.Character:FindFirstChild("LunarChams") then
-                    local h=Instance.new("Highlight"); h.Name="LunarChams"; h.FillColor=getgenv().LunarState.Config.Visuals.ChamsColor; h.FillTransparency=0.5; h.Parent=plr.Character
+            
+            Workspace.Gravity = getgenv().LunarState.Config.Gravity
+            
+            if getgenv().LunarState.Fly then
+                local hrp = Character:FindFirstChild("HumanoidRootPart") or Character:FindFirstChild("Torso")
+                if hrp and not flyConn then
+                    flyBodyVel = Instance.new("BodyVelocity")
+                    flyBodyVel.MaxForce = Vector3.new(1,1,1)*1e6
+                    flyBodyVel.Velocity = Vector3.zero
+                    flyBodyVel.Parent = hrp
+                    
+                    flyBodyGyro = Instance.new("BodyGyro")
+                    flyBodyGyro.MaxTorque = Vector3.new(1,1,1)*1e6
+                    flyBodyGyro.CFrame = hrp.CFrame
+                    flyBodyGyro.Parent = hrp
+                    
+                    flyConn = RunService.RenderStepped:Connect(function()
+                        if not getgenv().LunarState.Fly or not hrp then return end
+                        local move = Vector3.zero
+                        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + Camera.CFrame.LookVector end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move - Camera.CFrame.LookVector end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move = move - Camera.CFrame.RightVector end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move = move + Camera.CFrame.RightVector end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0,1,0) end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then move = move - Vector3.new(0,1,0) end
+                        flyBodyVel.Velocity = move * getgenv().LunarState.Config.FlySpeed
+                        flyBodyGyro.CFrame = Camera.CFrame
+                    end)
+                elseif not getgenv().LunarState.Fly and flyConn then
+                    flyConn:Disconnect()
+                    if flyBodyVel then flyBodyVel:Destroy() end
+                    if flyBodyGyro then flyBodyGyro:Destroy() end
+                    flyConn = nil
+                end
+            else
+                if flyConn then 
+                    flyConn:Disconnect()
+                    if flyBodyVel then flyBodyVel:Destroy() end
+                    if flyBodyGyro then flyBodyGyro:Destroy() end
+                    flyConn = nil 
                 end
             end
-        else
-            for _, plr in ipairs(Players:GetPlayers()) do if plr.Character then local h=plr.Character:FindFirstChild("LunarChams"); if h then h:Destroy() end end end
+            
+            if getgenv().LunarState.Noclip then
+                if not noclipConn then 
+                    noclipConn = RunService.Stepped:Connect(function() 
+                        if Character then 
+                            for _,p in ipairs(Character:GetChildren()) do 
+                                if p:IsA("BasePart") then p.CanCollide = false end 
+                            end 
+                        end 
+                    end) 
+                end
+            elseif noclipConn then 
+                noclipConn:Disconnect(); noclipConn = nil 
+            end
+            
+            if getgenv().LunarState.InfJump then
+                if not infJumpConn then 
+                    infJumpConn = UserInputService.JumpRequest:Connect(function() 
+                        local h = Character:FindFirstChildOfClass("Humanoid")
+                        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end 
+                    end) 
+                end
+            elseif infJumpConn then 
+                infJumpConn:Disconnect(); infJumpConn = nil 
+            end
+            
+            if getgenv().LunarState.NoFallDamage then
+                if not fallConn then
+                    fallConn = hum.StateChanged:Connect(function(old, new)
+                        if new == Enum.HumanoidStateType.Freefall then
+                            hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+                            task.wait(0.1)
+                            hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+                        end
+                    end)
+                end
+            elseif fallConn then
+                fallConn:Disconnect(); fallConn = nil
+            end
+            
+            if getgenv().LunarState.SpinBot then
+                if not spinConn then
+                    spinConn = RunService.RenderStepped:Connect(function()
+                        local hrp = Character:FindFirstChild("HumanoidRootPart")
+                        if hrp then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(tick()*500), 0) end
+                    end)
+                end
+            elseif spinConn then 
+                spinConn:Disconnect(); spinConn = nil 
+            end
+            
+            if getgenv().LunarState.AntiFling then
+                if not antiFlingConn then
+                    antiFlingConn = RunService.Heartbeat:Connect(function()
+                        local hrp = Character:FindFirstChild("HumanoidRootPart")
+                        if not hrp then return end
+                        local currentVel = hrp.Velocity
+                        if currentVel.Magnitude > 1000 then
+                            if not originalCFrames[Character] then
+                                originalCFrames[Character] = hrp.CFrame
+                            end
+                            hrp.CFrame = originalCFrames[Character]
+                            hrp.Velocity = Vector3.new(0, 0, 0)
+                            hrp.RotVelocity = Vector3.new(0, 0, 0)
+                            task.delay(0.5, function() originalCFrames[Character] = nil end)
+                        else
+                            originalCFrames[Character] = hrp.CFrame
+                        end
+                    end)
+                end
+            elseif antiFlingConn then
+                antiFlingConn:Disconnect(); antiFlingConn = nil
+                originalCFrames = {}
+            end
         end
+        
+        UpdateChams()
     end
 
-    if isFeatureActive("Aimbot") and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+    if getgenv().LunarState.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local target = GetClosestTarget()
         if target and target.Character then
             local partName = getgenv().LunarState.Config.HitPart
             local part = target.Character:FindFirstChild(partName) or target.Character:FindFirstChild("HumanoidRootPart")
             if part then
-                local targetPos = part.Position; local currentPos = Camera.CFrame.Position
-                local smooth = getgenv().LunarState.Config.AimSmoothness
+                local targetPos = part.Position
+                local currentPos = Camera.CFrame.Position
+                local smooth = getgenv().LunarState.Config.AimSmooth
                 Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(currentPos, targetPos), smooth)
             end
         end
     end
 
-    if isFeatureActive("Trigger") then
+    if getgenv().LunarState.Trigger then
         local target = Mouse.Target
         if target then
             local model = target:FindFirstAncestorWhichIsA("Model")
             if model then
                 local plr = Players:GetPlayerFromCharacter(model)
-                if plr and isEnemy(plr) then mouse1press(); task.wait(getgenv().LunarState.Config.TriggerDelay); mouse1release() end
+                if plr and isEnemy(plr) then 
+                    mouse1press()
+                    task.wait(getgenv().LunarState.Config.TriggerDelay)
+                    mouse1release() 
+                end
             end
         end
     end
 
-    if frameSkip % 2 ~= 0 then return end
-    local lIdx = 1; local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    for _, p in pairs(Players:GetPlayers()) do
-        if isEnemy(p) and p.Character then
-            createEsp(p)
-            if getgenv().LunarState.Tracers and hasDrawing then
-                local root = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso")
-                if root then
-                    local pos, on = Camera:WorldToViewportPoint(root.Position)
-                    if on then
-                        local l = getgenv().LunarState.Lines[lIdx] or Drawing.new("Line")
-                        l.Visible=true; l.Thickness=getgenv().LunarState.Config.Visuals.TracerThickness
-                        l.Color=getgenv().LunarState.Config.Visuals.TracerColor; l.From=center; l.To=Vector2.new(pos.X, pos.Y)
-                        getgenv().LunarState.Lines[lIdx] = l; lIdx = lIdx + 1
+    if frameSkip % 2 == 0 then
+        local lIdx = 1
+        local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        
+        for _, p in pairs(Players:GetPlayers()) do
+            if isEnemy(p) and p.Character then
+                local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                local dist = myHRP and (myHRP.Position - (p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso")).Position).Magnitude or 9999
+                
+                if dist <= getgenv().LunarState.Config.Visuals.MaxDistance then
+                    UpdateESP(p)
+                    
+                    if getgenv().LunarState.Tracers and hasDrawing then
+                        local root = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso")
+                        if root then
+                            local pos, on = Camera:WorldToViewportPoint(root.Position)
+                            if on then
+                                local l = getgenv().LunarState.Lines[lIdx] or Drawing.new("Line")
+                                l.Visible = true
+                                l.Thickness = getgenv().LunarState.Config.Visuals.TracerThickness
+                                l.Color = getgenv().LunarState.Config.Visuals.TracerColor
+                                l.From = center
+                                l.To = Vector2.new(pos.X, pos.Y)
+                                getgenv().LunarState.Lines[lIdx] = l
+                                lIdx = lIdx + 1
+                            end
+                        end
                     end
+                else
+                    HideESPObject(p)
+                end
+            else
+                if p.Character and getgenv().LunarState.ESPObjects[p] then 
+                    HideESPObject(p) 
                 end
             end
-        else if p.Character and ESPObjects[p] then HideESPObject(p) end end
+        end
+        
+        for i = lIdx, #getgenv().LunarState.Lines do 
+            getgenv().LunarState.Lines[i].Visible = false 
+        end
     end
-    for i = lIdx, #getgenv().LunarState.Lines do getgenv().LunarState.Lines[i].Visible = false end
 end)
 
 UserInputService.InputBegan:Connect(function(i, gp)
     if gp then return end
     if i.KeyCode == Enum.KeyCode.RightShift then
-        Library:Toggle(); if not MyUI then SyncUI() end
-        if MyUI then uiVisible = not uiVisible; MyUI.Enabled = uiVisible end
+        Library:Toggle()
     end
 end)
 
-print("[Lunar] Universal Script V1 initialized successfully!")
+Library:Notify({ 
+    Title = "Welcome", 
+    Description = "Lunar Universal V2 loaded successfully!", 
+    Time = 5 
+})
+
+print("[Lunar] Universal Script V2 initialized successfully!")
