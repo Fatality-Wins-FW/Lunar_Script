@@ -37,6 +37,13 @@ local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 local Options = Library.Options
 local Toggles = Library.Toggles
 
+-- FIX: Set Library for managers BEFORE creating window/sections
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+SaveManager:SetFolder("Lunar_Script/universalv2")
+
 local Window = Library:CreateWindow({
     Title = "Lunar",
     Footer = "Universal V2",
@@ -583,6 +590,7 @@ do
             Default = "RightShift", NoUI = true, Text = "Menu keybind" 
         })
 
+    -- Build sections AFTER library is set
     SaveManager:BuildConfigSection(Tabs.Settings)
     ThemeManager:ApplyToTab(Tabs.Settings)
 
@@ -600,13 +608,8 @@ do
     })
 end
 
--- SAVE/THEME MANAGER SETUP
+-- FINAL SETUP
 Library.ToggleKeybind = Options.MenuKeybind
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
-SaveManager:SetFolder("Lunar_Script/universalv2")
 SaveManager:LoadAutoloadConfig()
 
 -- MAIN RUNTIME LOOP
